@@ -113,6 +113,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		(IDXGISwapChain1**)&_swapchain
 	);
 
+	// ディスクリプターヒープ
+	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+	heapDesc.NodeMask = 0;
+	heapDesc.NumDescriptors = 2;
+	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	ID3D12DescriptorHeap* rtvHeaps = nullptr;
+	result = _dev->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&rtvHeaps));
+
+	// スワップチェーンに関連付け
+	std::vector<ID3D12Resource*> _backBuffers(swapChainDesc.BufferCount);
+	D3D12_CPU_DESCRIPTOR_HANDLE cpuDescHandle = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
+	for (int idx = 0; idx < swapChainDesc.BufferCount; ++idx) {
+		result = _swapchain->GetBuffer(idx, IID_PPV_ARGS(&_backBuffers[idx]));
+		_dev->CreateRenderTargetView(_backBuffers[idx], nullptr, cpuDescHandle);
+		cpuDescHandle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	}
+
 	ShowWindow(hWnd, SW_SHOW);
 
 	MSG msg = {};
