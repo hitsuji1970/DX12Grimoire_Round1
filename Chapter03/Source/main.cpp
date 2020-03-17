@@ -128,7 +128,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	for (int idx = 0; idx < swapChainDesc.BufferCount; ++idx) {
 		result = _swapchain->GetBuffer(idx, IID_PPV_ARGS(&_backBuffers[idx]));
 		_dev->CreateRenderTargetView(_backBuffers[idx], nullptr, cpuDescHandle);
-		cpuDescHandle.ptr += idx * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		cpuDescHandle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	}
 
 	ShowWindow(hWnd, SW_SHOW);
