@@ -143,6 +143,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		cpuDescHandle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	}
 
+	// ƒtƒFƒ“ƒX
+	ID3D12Fence* _fence = nullptr;
+	UINT64 _fenceVal = 0;
+	result = _dev->CreateFence(_fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence));
+
 	ShowWindow(hWnd, SW_SHOW);
 
 	MSG msg = {};
@@ -167,6 +172,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 		ID3D12CommandList* cmdLists[] = { _cmdList };
 		_cmdQueue->ExecuteCommandLists(1, cmdLists);
+		_cmdQueue->Signal(_fence, ++_fenceVal);
+		if (_fence->GetCompletedValue() != _fenceVal) {
+			auto event = CreateEvent(nullptr, false, false, nullptr);
+			_fence->SetEventOnCompletion(_fenceVal, event);
+			WaitForSingleObject(event, INFINITE);
+			CloseHandle(event);
+		}
+
 		_cmdAllocator->Reset();
 		_cmdList->Reset(_cmdAllocator, nullptr);
 
