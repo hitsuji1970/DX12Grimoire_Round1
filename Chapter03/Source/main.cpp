@@ -13,6 +13,7 @@ using namespace std;
 
 HWND InitWindow(WNDCLASSEX* const pWndClass);
 LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+void EnableDebugLayer();
 
 constexpr unsigned int window_width = 1280;
 constexpr unsigned int window_height = 720;
@@ -50,8 +51,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	};
 	D3D_FEATURE_LEVEL featureLevel;
 
+	HRESULT result = S_OK;
 #ifdef _DEBUG
-	auto result = CreateDXGIFactory1(IID_PPV_ARGS(&_dxgiFactory));
+	EnableDebugLayer();
+	if (FAILED(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&_dxgiFactory)))) {
+		return -1;
+	}
+#else
+	if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&_dxgiFactory)))) {
+		return -1;
+	}
+#endif // _DEBUG
+
+#ifdef _DEBUG
 	std::vector<IDXGIAdapter*> adapters;
 	IDXGIAdapter* tmpAdapter = nullptr;
 	for (int i = 0; _dxgiFactory->EnumAdapters(i, &tmpAdapter) != DXGI_ERROR_NOT_FOUND; i++) {
@@ -111,7 +123,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	result = _dxgiFactory->CreateSwapChainForHwnd(
 		_cmdQueue, hWnd, &swapChainDesc, nullptr, nullptr,
 		(IDXGISwapChain1**)&_swapchain
-	);
+		);
 
 	// ディスクリプターヒープ
 	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
@@ -152,7 +164,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		float clearColor[] = { 0.0f, 1.0f, 0.0f, 1.0f };
 		_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
 		_cmdList->Close();
-		
+
 		ID3D12CommandList* cmdLists[] = { _cmdList };
 		_cmdQueue->ExecuteCommandLists(1, cmdLists);
 		_cmdAllocator->Reset();
@@ -203,4 +215,10 @@ LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	return DefWindowProc(hwnd, msg, wparam, lparam);
 }
 
-
+void EnableDebugLayer()
+{
+	ID3D12Debug* debugLayer = nullptr;
+	auto result = D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer));
+	debugLayer->EnableDebugLayer();
+	debugLayer->Release();
+}
