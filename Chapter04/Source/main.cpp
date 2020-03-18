@@ -1,5 +1,6 @@
 #include <vector>
 #include <d3d12.h>
+#include <DirectXMath.h>
 #include <dxgi1_6.h>
 #include <Windows.h>
 #include <tchar.h>
@@ -7,16 +8,21 @@
 #include <iostream>
 #endif
 
+using namespace DirectX;
+
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 
+// 関数プロトタイプ
 HWND InitWindow(WNDCLASSEX* const pWndClass);
 LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 void EnableDebugLayer();
 
+// 定数
 constexpr unsigned int window_width = 1280;
 constexpr unsigned int window_height = 720;
 
+// DirextXオブジェクト
 IDXGIFactory6* _dxgiFactory = nullptr;
 ID3D12Device* _dev = nullptr;
 IDXGISwapChain4* _swapchain = nullptr;
@@ -24,6 +30,7 @@ ID3D12CommandAllocator* _cmdAllocator = nullptr;
 ID3D12GraphicsCommandList* _cmdList = nullptr;
 ID3D12CommandQueue* _cmdQueue = nullptr;
 
+// デバッグ出力
 void DebugOutputFromString(const char* format, ...)
 {
 #ifdef _DEBUG
@@ -137,7 +144,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	// スワップチェーンに関連付け
 	std::vector<ID3D12Resource*> _backBuffers(swapChainDesc.BufferCount);
 	D3D12_CPU_DESCRIPTOR_HANDLE cpuDescHandle = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
-	for (int idx = 0; idx < swapChainDesc.BufferCount; ++idx) {
+	for (auto idx = 0u; idx < swapChainDesc.BufferCount; ++idx) {
 		result = _swapchain->GetBuffer(idx, IID_PPV_ARGS(&_backBuffers[idx]));
 		_dev->CreateRenderTargetView(_backBuffers[idx], nullptr, cpuDescHandle);
 		cpuDescHandle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
