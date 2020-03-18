@@ -3,13 +3,12 @@
 #include <dxgi1_6.h>
 #include <Windows.h>
 #include <tchar.h>
-#pragma comment(lib, "d3d12.lib")
-#pragma comment(lib, "dxgi.lib")
-
 #ifdef _DEBUG
 #include <iostream>
 #endif
-using namespace std;
+
+#pragma comment(lib, "d3d12.lib")
+#pragma comment(lib, "dxgi.lib")
 
 HWND InitWindow(WNDCLASSEX* const pWndClass);
 LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
@@ -18,12 +17,19 @@ void EnableDebugLayer();
 constexpr unsigned int window_width = 1280;
 constexpr unsigned int window_height = 720;
 
+IDXGIFactory6* _dxgiFactory = nullptr;
+ID3D12Device* _dev = nullptr;
+IDXGISwapChain4* _swapchain = nullptr;
+ID3D12CommandAllocator* _cmdAllocator = nullptr;
+ID3D12GraphicsCommandList* _cmdList = nullptr;
+ID3D12CommandQueue* _cmdQueue = nullptr;
+
 void DebugOutputFromString(const char* format, ...)
 {
 #ifdef _DEBUG
 	va_list valist;
 	va_start(valist, format);
-	printf(format, valist);
+	std::printf(format, valist);
 	va_end(valist);
 #endif
 }
@@ -39,23 +45,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	WNDCLASSEX w = {};
 	HWND hWnd = InitWindow(&w);
 
-	ID3D12Device* _dev = nullptr;
-	IDXGIFactory6* _dxgiFactory = nullptr;
-	IDXGISwapChain4* _swapchain = nullptr;
-
 	D3D_FEATURE_LEVEL levels[] = {
 		D3D_FEATURE_LEVEL_12_1,
 		D3D_FEATURE_LEVEL_12_0,
 		D3D_FEATURE_LEVEL_11_1,
 		D3D_FEATURE_LEVEL_11_0,
 	};
-	D3D_FEATURE_LEVEL featureLevel;
 
 	HRESULT result = S_OK;
 #ifdef _DEBUG
 	EnableDebugLayer();
 	if (FAILED(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&_dxgiFactory)))) {
-		return -1;
+		if (FAILED(CreateDXGIFactory2(0, IID_PPV_ARGS(&_dxgiFactory)))) {
+			return -1;
+		}
 	}
 #else
 	if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&_dxgiFactory)))) {
@@ -80,6 +83,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	}
 #endif
 
+	D3D_FEATURE_LEVEL featureLevel;
 	for (auto lv : levels) {
 		if (D3D12CreateDevice(nullptr, lv, IID_PPV_ARGS(&_dev)) == S_OK) {
 			featureLevel = lv;
@@ -93,12 +97,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	}
 
 	// コマンドリスト
-	ID3D12CommandAllocator* _cmdAllocator = nullptr;
-	ID3D12GraphicsCommandList* _cmdList = nullptr;
 	result = _dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_cmdAllocator));
 	result = _dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _cmdAllocator, nullptr, IID_PPV_ARGS(&_cmdList));
 
-	ID3D12CommandQueue* _cmdQueue = nullptr;
 	D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
 	cmdQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 	cmdQueueDesc.NodeMask = 0;
@@ -122,8 +123,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 	result = _dxgiFactory->CreateSwapChainForHwnd(
 		_cmdQueue, hWnd, &swapChainDesc, nullptr, nullptr,
-		(IDXGISwapChain1**)&_swapchain
-		);
+		(IDXGISwapChain1**)&_swapchain);
 
 	// ディスクリプターヒープ
 	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
@@ -183,6 +183,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 		BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
 		_cmdList->ResourceBarrier(1, &BarrierDesc);
+
 		_cmdList->Close();
 
 		ID3D12CommandList* cmdLists[] = { _cmdList };
@@ -208,6 +209,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 HWND InitWindow(WNDCLASSEX* const pWndClass)
 {
+	DebugOutputFromString("Show window test.");
 	pWndClass->cbSize = sizeof(WNDCLASSEX);
 	pWndClass->lpfnWndProc = WNDPROC(WindowProcedure);
 	pWndClass->lpszClassName = _T("DX12Sample");
