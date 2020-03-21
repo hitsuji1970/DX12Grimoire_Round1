@@ -1,9 +1,11 @@
-#include <vector>
-#include <d3d12.h>
-#include <DirectXMath.h>
-#include <dxgi1_6.h>
 #include <Windows.h>
 #include <tchar.h>
+#include <d3d12.h>
+#include <dxgi1_6.h>
+#include <DirectXMath.h>
+#include <d3dcompiler.h>
+#include <vector>
+
 #ifdef _DEBUG
 #include <iostream>
 #endif
@@ -12,6 +14,7 @@ using namespace DirectX;
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
+#pragma comment(lib, "d3dcompiler.lib")
 
 // 関数プロトタイプ
 HWND InitWindow(WNDCLASSEX* const pWndClass);
@@ -157,6 +160,170 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	ShowWindow(hWnd, SW_SHOW);
 
+	// 頂点リソース
+	XMFLOAT3 vertices[] = {
+		{-1.0f, -1.0f, 0.0f}, // 左下
+		{-1.0f,  1.0f, 0.0f}, // 左上
+		{ 1.0f, -1.0f, 0.0f} // 右下
+	};
+
+	D3D12_HEAP_PROPERTIES heapprop = {};
+	heapprop.Type = D3D12_HEAP_TYPE_UPLOAD;
+	heapprop.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	heapprop.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+
+	D3D12_RESOURCE_DESC resdesc = {};
+	resdesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resdesc.Width = sizeof(vertices);
+	resdesc.Height = 1;
+	resdesc.DepthOrArraySize = 1;
+	resdesc.MipLevels = 1;
+	resdesc.Format = DXGI_FORMAT_UNKNOWN;
+	resdesc.SampleDesc.Count = 1;
+	resdesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+	resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+	// 頂点バッファー
+	ID3D12Resource* vertBuff = nullptr;
+	result = _dev->CreateCommittedResource(
+		&heapprop, D3D12_HEAP_FLAG_NONE,
+		&resdesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr, IID_PPV_ARGS(&vertBuff));
+
+	XMFLOAT3* vertMap = nullptr;
+	result = vertBuff->Map(0, nullptr, (void**)&vertMap);
+	std::copy(std::begin(vertices), std::end(vertices), vertMap);
+	vertBuff->Unmap(0, nullptr);
+
+	D3D12_VERTEX_BUFFER_VIEW vbView = {};
+	vbView.BufferLocation = vertBuff->GetGPUVirtualAddress();
+	vbView.SizeInBytes = sizeof(vertices);
+	vbView.StrideInBytes = sizeof(vertices[0]);
+
+	// シェーダー
+	ID3DBlob* _vsBlob = nullptr;
+	ID3DBlob* _psBlob = nullptr;
+	ID3DBlob* errorBlob = nullptr;
+
+	result = D3DCompileFromFile(
+		L"Source/BasicVertexShader.hlsl",
+		nullptr,
+		D3D_COMPILE_STANDARD_FILE_INCLUDE,
+		"BasicVS", "vs_5_0",
+		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
+		0,
+		&_vsBlob, &errorBlob);
+
+	if (FAILED(result)) {
+		if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
+			::OutputDebugStringA("ファイルが見つかりません");
+			return 0;
+		}
+		else {
+			std::string errStr;
+			errStr.resize(errorBlob->GetBufferSize());
+			std::copy_n((char*)errorBlob->GetBufferPointer(), errorBlob->GetBufferSize(), errStr.begin());
+			errStr += "\n";
+			::OutputDebugStringA(errStr.c_str());
+		}
+	}
+
+	result = D3DCompileFromFile(
+		L"Source/BasicPixelShader.hlsl",
+		nullptr,
+		D3D_COMPILE_STANDARD_FILE_INCLUDE,
+		"BasicPS", "ps_5_0",
+		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
+		0,
+		&_psBlob, &errorBlob);
+
+	if (FAILED(result)) {
+		if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
+			::OutputDebugStringA("ファイルが見つかりません");
+			return 0;
+		}
+		else {
+			std::string errStr;
+			errStr.resize(errorBlob->GetBufferSize());
+			std::copy_n((char*)errorBlob->GetBufferPointer(), errorBlob->GetBufferSize(), errStr.begin());
+			errStr += "\n";
+			::OutputDebugStringA(errStr.c_str());
+		}
+	}
+
+	// 頂点レイアウト
+	D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
+		{
+			"Position", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
+			D3D12_APPEND_ALIGNED_ELEMENT,
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
+		}
+	};
+
+	D3D12_ROOT_SIGNATURE_DESC rootsignatureDesc = {};
+	rootsignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+	ID3DBlob* rootSigBlob = nullptr;
+	result = D3D12SerializeRootSignature(
+		&rootsignatureDesc,
+		D3D_ROOT_SIGNATURE_VERSION_1_0,
+		&rootSigBlob,
+		&errorBlob);
+
+	ID3D12RootSignature* rootSignature = nullptr;
+	result = _dev->CreateRootSignature(
+		0,
+		rootSigBlob->GetBufferPointer(),
+		rootSigBlob->GetBufferSize(),
+		IID_PPV_ARGS(&rootSignature));
+	rootSigBlob->Release();
+
+	// パイプラインステート
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC piplineStateDesc = {};
+	piplineStateDesc.pRootSignature = rootSignature;
+	piplineStateDesc.VS.pShaderBytecode = _vsBlob->GetBufferPointer();
+	piplineStateDesc.VS.BytecodeLength = _vsBlob->GetBufferSize();
+	piplineStateDesc.PS.pShaderBytecode = _psBlob->GetBufferPointer();
+	piplineStateDesc.PS.BytecodeLength = _psBlob->GetBufferSize();
+	piplineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
+	piplineStateDesc.RasterizerState.MultisampleEnable = false;
+	piplineStateDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	piplineStateDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+	piplineStateDesc.RasterizerState.DepthClipEnable = true;
+	piplineStateDesc.BlendState.AlphaToCoverageEnable = false;
+	piplineStateDesc.BlendState.IndependentBlendEnable = false;
+
+	D3D12_RENDER_TARGET_BLEND_DESC renderTargetBlendDesc = {};
+	renderTargetBlendDesc.BlendEnable = false;
+	renderTargetBlendDesc.LogicOpEnable = false;
+	renderTargetBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+	piplineStateDesc.BlendState.RenderTarget[0] = renderTargetBlendDesc;
+	
+	piplineStateDesc.InputLayout.pInputElementDescs = inputLayout;
+	piplineStateDesc.InputLayout.NumElements = _countof(inputLayout);
+	piplineStateDesc.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
+	piplineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	piplineStateDesc.NumRenderTargets = 1;
+	piplineStateDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	piplineStateDesc.SampleDesc.Count = 1;
+	piplineStateDesc.SampleDesc.Quality = 0;
+
+	ID3D12PipelineState* _pipelineState = nullptr;
+	result = _dev->CreateGraphicsPipelineState(&piplineStateDesc, IID_PPV_ARGS(&_pipelineState));
+
+	D3D12_VIEWPORT viewport = {};
+	viewport.Width = window_width;
+	viewport.Height = window_height;
+	viewport.TopLeftX = 0;
+	viewport.TopLeftY = 0;
+	viewport.MaxDepth = 1.0f;
+	viewport.MinDepth = 0.0f;
+
+	D3D12_RECT scissorRect = {};
+	scissorRect.top = 0;
+	scissorRect.left = 0;
+	scissorRect.right = scissorRect.left + window_width;
+	scissorRect.bottom = scissorRect.top + window_height;
+
 	MSG msg = {};
 
 	while (true) {
@@ -186,6 +353,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 		float clearColor[] = { 0.0f, 1.0f, 0.0f, 1.0f };
 		_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
+
+		_cmdList->SetPipelineState(_pipelineState);
+		_cmdList->RSSetViewports(1, &viewport);
+		_cmdList->RSSetScissorRects(1, &scissorRect);
+		_cmdList->SetGraphicsRootSignature(rootSignature);
+		_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		_cmdList->IASetVertexBuffers(0, 1, &vbView);
+		_cmdList->DrawInstanced(3, 1, 0, 0);
 
 		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 		BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
