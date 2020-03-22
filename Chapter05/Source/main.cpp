@@ -3,6 +3,7 @@
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <DirectXMath.h>
+#include <DirectXTex.h>
 #include <d3dcompiler.h>
 #include <vector>
 
@@ -13,11 +14,12 @@
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
+#pragma comment(lib, "DirectXTex.lib")
 
 // 関数プロトタイプ
 HWND InitWindow(WNDCLASSEX* const pWndClass);
 LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
-HRESULT CreateTextureResource(ID3D12Resource** ppvResource);
+HRESULT CreateTextureResource(const DirectX::TexMetadata& texMetaData, ID3D12Resource** ppvResource);
 void DebugOutputFromString(const char* format, ...);
 void EnableDebugLayer();
 
@@ -225,21 +227,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	ibView.SizeInBytes = sizeof(indices);
 
 	// テクスチャーリソース
-	std::vector<TexRGBA> textureData(256 * 256);
-	for (auto& rgba : textureData) {
-		rgba.R = rand() & 0xFF;
-		rgba.G = rand() & 0xFF;
-		rgba.B = rand() & 0xFF;
-		rgba.A = 0xFF;
-	}
+	DirectX::TexMetadata texMetaData = {};
+	DirectX::ScratchImage scratchImg = {};
+	result = DirectX::LoadFromWICFile(
+		L"img/textest.png", DirectX::WIC_FLAGS_NONE,
+		&texMetaData, scratchImg);
+
+	auto img = scratchImg.GetImage(0, 0, 0);
 
 	// テクスチャーバッファー
 	ID3D12Resource* texBuff = nullptr;
-	result = CreateTextureResource(&texBuff);
-	result = texBuff->WriteToSubresource(
-		0, nullptr, textureData.data(),
-		sizeof(TexRGBA) * 256,
-		sizeof(TexRGBA) * textureData.size());
+	result = CreateTextureResource(texMetaData, &texBuff);
+	result = texBuff->WriteToSubresource(0, nullptr, img->pixels, img->rowPitch, img->slicePitch);
 
 	// シェーダーリソースビュー
 	ID3D12DescriptorHeap* texDescHeap = nullptr;
@@ -251,7 +250,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	result = _dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&texDescHeap));
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	srvDesc.Format = texMetaData.format;
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MipLevels = 1;
@@ -521,7 +520,7 @@ LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	return DefWindowProc(hwnd, msg, wparam, lparam);
 }
 
-HRESULT CreateTextureResource(ID3D12Resource** ppvResource)
+HRESULT CreateTextureResource(const DirectX::TexMetadata& texMetaData, ID3D12Resource** ppvResource)
 {
 	D3D12_HEAP_PROPERTIES heapProp = {};
 	heapProp.Type = D3D12_HEAP_TYPE_CUSTOM;
@@ -531,14 +530,14 @@ HRESULT CreateTextureResource(ID3D12Resource** ppvResource)
 	heapProp.VisibleNodeMask = 0;
 
 	D3D12_RESOURCE_DESC resDesc = {};
-	resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	resDesc.Width = 256;
-	resDesc.Height = 256;
-	resDesc.DepthOrArraySize = 1;
+	resDesc.Format = texMetaData.format;
+	resDesc.Width = texMetaData.width;
+	resDesc.Height = texMetaData.height;
+	resDesc.DepthOrArraySize = texMetaData.arraySize;
 	resDesc.SampleDesc.Count = 1;
 	resDesc.SampleDesc.Quality = 0;
-	resDesc.MipLevels = 1;
-	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	resDesc.MipLevels = texMetaData.mipLevels;
+	resDesc.Dimension = static_cast<D3D12_RESOURCE_DIMENSION>(texMetaData.dimension);
 	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
