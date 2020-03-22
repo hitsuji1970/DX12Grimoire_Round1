@@ -1,4 +1,4 @@
-#include <Windows.h>
+ï»¿#include <Windows.h>
 #include <tchar.h>
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -10,22 +10,22 @@
 #include <iostream>
 #endif
 
-using namespace DirectX;
-
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
 
-// ŠÖ”ƒvƒƒgƒ^ƒCƒv
+// é–¢æ•°ãƒ—ãƒ­ãƒˆã‚¿ã‚¤ãƒ—
 HWND InitWindow(WNDCLASSEX* const pWndClass);
 LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+HRESULT CreateTextureResource(ID3D12Resource** ppvResource);
+void DebugOutputFromString(const char* format, ...);
 void EnableDebugLayer();
 
-// ’è”
+// å®šæ•°
 constexpr unsigned int window_width = 1280;
 constexpr unsigned int window_height = 720;
 
-// DirextXƒIƒuƒWƒFƒNƒg
+// DirextXã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆ
 IDXGIFactory6* _dxgiFactory = nullptr;
 ID3D12Device* _dev = nullptr;
 IDXGISwapChain4* _swapchain = nullptr;
@@ -33,16 +33,17 @@ ID3D12CommandAllocator* _cmdAllocator = nullptr;
 ID3D12GraphicsCommandList* _cmdList = nullptr;
 ID3D12CommandQueue* _cmdQueue = nullptr;
 
-// ƒfƒoƒbƒOo—Í
-void DebugOutputFromString(const char* format, ...)
+// é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿æ§‹é€ ä½“
+struct Vertex {
+	DirectX::XMFLOAT3 pos;
+	DirectX::XMFLOAT2 uv;
+};
+
+// ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ¼ãƒ†ã‚¹ãƒˆæ§‹é€ ä½“
+struct TexRGBA
 {
-#ifdef _DEBUG
-	va_list valist;
-	va_start(valist, format);
-	std::vprintf(format, valist);
-	va_end(valist);
-#endif
-}
+	unsigned char R, G, B, A;
+};
 
 #ifdef _DEBUG
 int main()
@@ -102,11 +103,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	}
 
 	if (!_dev) {
-		::MessageBox(hWnd, _T("Error"), _T("D3DƒfƒoƒCƒX‚Ì‰Šú‰»‚É¸”s‚µ‚Ü‚µ‚½B"), MB_ICONERROR);
+		::MessageBox(hWnd, _T("Error"), _T("D3Dãƒ‡ãƒã‚¤ã‚¹ã®åˆæœŸåŒ–ã«å¤±æ•—ã—ã¾ã—ãŸã€‚"), MB_ICONERROR);
 		exit(-1);
 	}
 
-	// ƒRƒ}ƒ“ƒhƒŠƒXƒg
+	// ã‚³ãƒãƒ³ãƒ‰ãƒªã‚¹ãƒˆ
 	result = _dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_cmdAllocator));
 	result = _dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _cmdAllocator, nullptr, IID_PPV_ARGS(&_cmdList));
 
@@ -117,7 +118,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	cmdQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 	result = _dev->CreateCommandQueue(&cmdQueueDesc, IID_PPV_ARGS(&_cmdQueue));
 
-	// ƒXƒƒbƒvƒ`ƒF[ƒ“
+	// ã‚¹ãƒ¯ãƒƒãƒ—ãƒã‚§ãƒ¼ãƒ³
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
 	swapChainDesc.Width = window_width;
 	swapChainDesc.Height = window_height;
@@ -135,7 +136,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		_cmdQueue, hWnd, &swapChainDesc, nullptr, nullptr,
 		(IDXGISwapChain1**)&_swapchain);
 
-	// ƒfƒBƒXƒNƒŠƒvƒ^[ƒq[ƒv
+	// ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒ¼ãƒ’ãƒ¼ãƒ—
 	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
 	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	heapDesc.NodeMask = 0;
@@ -144,7 +145,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	ID3D12DescriptorHeap* rtvHeaps = nullptr;
 	result = _dev->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&rtvHeaps));
 
-	// ƒXƒƒbƒvƒ`ƒF[ƒ“‚ÉŠÖ˜A•t‚¯
+	// ã‚¹ãƒ¯ãƒƒãƒ—ãƒã‚§ãƒ¼ãƒ³ã«é–¢é€£ä»˜ã‘
 	std::vector<ID3D12Resource*> _backBuffers(swapChainDesc.BufferCount);
 	D3D12_CPU_DESCRIPTOR_HANDLE cpuDescHandle = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
 	for (auto idx = 0u; idx < swapChainDesc.BufferCount; ++idx) {
@@ -153,19 +154,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		cpuDescHandle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	}
 
-	// ƒtƒFƒ“ƒX
+	// ãƒ•ã‚§ãƒ³ã‚¹
 	ID3D12Fence* _fence = nullptr;
 	UINT64 _fenceVal = 0;
 	result = _dev->CreateFence(_fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence));
 
 	ShowWindow(hWnd, SW_SHOW);
 
-	// ’¸“_ƒŠƒ\[ƒX
-	XMFLOAT3 vertices[] = {
-		{-0.4f, -0.7f, 0.0f}, // 0:¶‰º
-		{-0.4f,  0.7f, 0.0f}, // 1:¶ã
-		{ 0.4f, -0.7f, 0.0f}, // 2:‰E‰º
-		{ 0.4f,  0.7f, 0.0f}, // 3:‰Eã
+	// é ‚ç‚¹ãƒªã‚½ãƒ¼ã‚¹
+	Vertex vertices[] = {
+		{{-0.4f, -0.7f, 0.0f}, {0.0f, 1.0f}}, // 0:å·¦ä¸‹
+		{{-0.4f,  0.7f, 0.0f}, {0.0f, 0.0f}}, // 1:å·¦ä¸Š
+		{{ 0.4f, -0.7f, 0.0f}, {1.0f, 1.0f}}, // 2:å³ä¸‹
+		{{ 0.4f,  0.7f, 0.0f}, {1.0f, 0.0f}}, // 3:å³ä¸Š
 	};
 
 	unsigned short indices[] = {
@@ -189,14 +190,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	resdesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 	resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-	// ’¸“_ƒoƒbƒtƒ@[
+	// é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ãƒ¼
 	ID3D12Resource* vertBuff = nullptr;
 	result = _dev->CreateCommittedResource(
 		&heapprop, D3D12_HEAP_FLAG_NONE,
 		&resdesc, D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr, IID_PPV_ARGS(&vertBuff));
 
-	XMFLOAT3* vertMap = nullptr;
+	Vertex* vertMap = nullptr;
 	result = vertBuff->Map(0, nullptr, (void**)&vertMap);
 	std::copy(std::begin(vertices), std::end(vertices), vertMap);
 	vertBuff->Unmap(0, nullptr);
@@ -206,13 +207,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	vbView.SizeInBytes = sizeof(vertices);
 	vbView.StrideInBytes = sizeof(vertices[0]);
 
-	// ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@[
+	// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡ãƒ¼
 	ID3D12Resource* idxBuff = nullptr;
 	result = _dev->CreateCommittedResource(
 		&heapprop, D3D12_HEAP_FLAG_NONE,
 		&resdesc, D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr, IID_PPV_ARGS(&idxBuff));
-	
+
 	unsigned short* mappedIndex = nullptr;
 	idxBuff->Map(0, nullptr, (void**)&mappedIndex);
 	std::copy(std::begin(indices), std::end(indices), mappedIndex);
@@ -223,7 +224,40 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	ibView.Format = DXGI_FORMAT_R16_UINT;
 	ibView.SizeInBytes = sizeof(indices);
 
-	// ƒVƒF[ƒ_[
+	// ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ¼ãƒªã‚½ãƒ¼ã‚¹
+	std::vector<TexRGBA> textureData(256 * 256);
+	for (auto& rgba : textureData) {
+		rgba.R = rand() & 0xFF;
+		rgba.G = rand() & 0xFF;
+		rgba.B = rand() & 0xFF;
+		rgba.A = 0xFF;
+	}
+
+	// ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ¼ãƒãƒƒãƒ•ã‚¡ãƒ¼
+	ID3D12Resource* texBuff = nullptr;
+	result = CreateTextureResource(&texBuff);
+	result = texBuff->WriteToSubresource(
+		0, nullptr, textureData.data(),
+		sizeof(TexRGBA) * 256,
+		sizeof(TexRGBA) * textureData.size());
+
+	// ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ãƒªã‚½ãƒ¼ã‚¹ãƒ“ãƒ¥ãƒ¼
+	ID3D12DescriptorHeap* texDescHeap = nullptr;
+	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
+	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	descHeapDesc.NodeMask = 0;
+	descHeapDesc.NumDescriptors = 1;
+	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	result = _dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&texDescHeap));
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Texture2D.MipLevels = 1;
+	_dev->CreateShaderResourceView(texBuff, &srvDesc, texDescHeap->GetCPUDescriptorHandleForHeapStart());
+
+	// ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼
 	ID3DBlob* _vsBlob = nullptr;
 	ID3DBlob* _psBlob = nullptr;
 	ID3DBlob* errorBlob = nullptr;
@@ -239,7 +273,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	if (FAILED(result)) {
 		if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
-			::OutputDebugStringA("ƒtƒ@ƒCƒ‹‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñ");
+			::OutputDebugStringA("ãƒ•ã‚¡ã‚¤ãƒ«ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“");
 			return 0;
 		}
 		else {
@@ -262,7 +296,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	if (FAILED(result)) {
 		if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
-			::OutputDebugStringA("ƒtƒ@ƒCƒ‹‚ªŒ©‚Â‚©‚è‚Ü‚¹‚ñ");
+			::OutputDebugStringA("ãƒ•ã‚¡ã‚¤ãƒ«ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“");
 			return 0;
 		}
 		else {
@@ -274,17 +308,50 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		}
 	}
 
-	// ’¸“_ƒŒƒCƒAƒEƒg
+	// é ‚ç‚¹ãƒ¬ã‚¤ã‚¢ã‚¦ãƒˆ
 	D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
-		{
+		{ // åº§æ¨™
 			"Position", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
 			D3D12_APPEND_ALIGNED_ELEMENT,
 			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
-		}
+		},
+		{ // UV
+			"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,
+			0, D3D12_APPEND_ALIGNED_ELEMENT,
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
+		},
 	};
+
+	D3D12_DESCRIPTOR_RANGE descTblRange = {};
+	descTblRange.NumDescriptors = 1;
+	descTblRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descTblRange.BaseShaderRegister = 0;
+	descTblRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+	D3D12_ROOT_PARAMETER rootParam = {};
+	rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParam.DescriptorTable.pDescriptorRanges = &descTblRange;
+	rootParam.DescriptorTable.NumDescriptorRanges = 1;
+
+	// ã‚µãƒ³ãƒ—ãƒ©ãƒ¼è¨­å®š
+	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
+	samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+	samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+	samplerDesc.MaxLOD = D3D12_SHADER_VISIBILITY_PIXEL;
+	samplerDesc.MinLOD = 0;
+	samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
 
 	D3D12_ROOT_SIGNATURE_DESC rootsignatureDesc = {};
 	rootsignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+	rootsignatureDesc.pParameters = &rootParam;
+	rootsignatureDesc.NumParameters = 1;
+	rootsignatureDesc.pStaticSamplers = &samplerDesc;
+	rootsignatureDesc.NumStaticSamplers = 1;
+
 	ID3DBlob* rootSigBlob = nullptr;
 	result = D3D12SerializeRootSignature(
 		&rootsignatureDesc,
@@ -300,7 +367,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		IID_PPV_ARGS(&rootSignature));
 	rootSigBlob->Release();
 
-	// ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒg
+	// ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆ
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC piplineStateDesc = {};
 	piplineStateDesc.pRootSignature = rootSignature;
 	piplineStateDesc.VS.pShaderBytecode = _vsBlob->GetBufferPointer();
@@ -320,7 +387,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	renderTargetBlendDesc.LogicOpEnable = false;
 	renderTargetBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 	piplineStateDesc.BlendState.RenderTarget[0] = renderTargetBlendDesc;
-	
+
 	piplineStateDesc.InputLayout.pInputElementDescs = inputLayout;
 	piplineStateDesc.InputLayout.NumElements = _countof(inputLayout);
 	piplineStateDesc.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
@@ -377,6 +444,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		float clearColor[] = { 0.0f, 1.0f, 0.0f, 1.0f };
 		_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
 
+		_cmdList->SetGraphicsRootSignature(rootSignature);
+		_cmdList->SetDescriptorHeaps(1, &texDescHeap);
+		_cmdList->SetGraphicsRootDescriptorTable(0, texDescHeap->GetGPUDescriptorHandleForHeapStart());
 		_cmdList->SetPipelineState(_pipelineState);
 		_cmdList->RSSetViewports(1, &viewport);
 		_cmdList->RSSetScissorRects(1, &scissorRect);
@@ -427,7 +497,7 @@ HWND InitWindow(WNDCLASSEX* const pWndClass)
 	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);
 
 	HWND hWnd = CreateWindow(pWndClass->lpszClassName,
-		_T("DX12ƒeƒXƒg"),
+		_T("DX12ãƒ†ã‚¹ãƒˆ"),
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
@@ -451,6 +521,37 @@ LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	return DefWindowProc(hwnd, msg, wparam, lparam);
 }
 
+HRESULT CreateTextureResource(ID3D12Resource** ppvResource)
+{
+	D3D12_HEAP_PROPERTIES heapProp = {};
+	heapProp.Type = D3D12_HEAP_TYPE_CUSTOM;
+	heapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
+	heapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
+	heapProp.CreationNodeMask = 0;
+	heapProp.VisibleNodeMask = 0;
+
+	D3D12_RESOURCE_DESC resDesc = {};
+	resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	resDesc.Width = 256;
+	resDesc.Height = 256;
+	resDesc.DepthOrArraySize = 1;
+	resDesc.SampleDesc.Count = 1;
+	resDesc.SampleDesc.Quality = 0;
+	resDesc.MipLevels = 1;
+	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+	return _dev->CreateCommittedResource(
+		&heapProp,
+		D3D12_HEAP_FLAG_NONE,
+		&resDesc,
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+		nullptr,
+		IID_PPV_ARGS(ppvResource));
+}
+
+
 void EnableDebugLayer()
 {
 	ID3D12Debug* debugLayer = nullptr;
@@ -458,3 +559,15 @@ void EnableDebugLayer()
 	debugLayer->EnableDebugLayer();
 	debugLayer->Release();
 }
+
+// ãƒ‡ãƒãƒƒã‚°å‡ºåŠ›
+void DebugOutputFromString(const char* format, ...)
+{
+#ifdef _DEBUG
+	va_list valist;
+	va_start(valist, format);
+	std::vprintf(format, valist);
+	va_end(valist);
+#endif
+}
+

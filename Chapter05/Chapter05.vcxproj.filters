@@ -30,4 +30,9 @@
       <Filter>シェーダーファイル</Filter>
     </FxCompile>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Source\BasicShaderHeader.hlsli">
+      <Filter>シェーダーファイル</Filter>
+    </None>
+  </ItemGroup>
 </Project>
