@@ -20,6 +20,7 @@
 HWND InitWindow(WNDCLASSEX* const pWndClass);
 LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 HRESULT CreateTextureResource(const DirectX::Image* const pImg, const DirectX::TexMetadata& texMetaData, ID3D12Resource** ppUploadBuffer, ID3D12Resource** ppTextureBuffer);
+size_t AlignmentedSize(size_t size, size_t alignment);
 void DebugOutputFromString(const char* format, ...);
 void EnableDebugLayer();
 
@@ -227,10 +228,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	ibView.SizeInBytes = sizeof(indices);
 
 	// テクスチャーリソース
+	//const wchar_t* textureFileName = L"img/textest.png";
+	const wchar_t* textureFileName = L"img/textest200x200.png";
 	DirectX::TexMetadata texMetaData = {};
 	DirectX::ScratchImage scratchImg = {};
 	result = DirectX::LoadFromWICFile(
-		L"img/textest.png", DirectX::WIC_FLAGS_NONE,
+		textureFileName, DirectX::WIC_FLAGS_NONE,
 		&texMetaData, scratchImg);
 
 	auto img = scratchImg.GetImage(0, 0, 0);
@@ -239,44 +242,63 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	ID3D12Resource* uploadBuff = nullptr;
 	ID3D12Resource* texBuff = nullptr;
 	result = CreateTextureResource(img, texMetaData, &uploadBuff, &texBuff);
+
 	uint8_t* mapforImg = nullptr;
 	result = uploadBuff->Map(0, nullptr, (void**)&mapforImg);
-	std::copy_n(img->pixels, img->slicePitch, mapforImg);
+	auto srcAddress = img->pixels;
+	auto rowPitch = AlignmentedSize(img->rowPitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+	for (int y = 0; y < img->height; y++) {
+		std::copy_n(srcAddress, rowPitch, mapforImg);
+		srcAddress += img->rowPitch;
+		mapforImg += rowPitch;
+	}
+	//std::copy_n(img->pixels, img->slicePitch, mapforImg);
 	uploadBuff->Unmap(0, nullptr);
 
-	// コピー元
-	D3D12_TEXTURE_COPY_LOCATION src = {};
-	src.pResource = uploadBuff;
-	src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-	src.PlacedFootprint.Offset = 0;
-	src.PlacedFootprint.Footprint.Width = texMetaData.width;
-	src.PlacedFootprint.Footprint.Height = texMetaData.height;
-	src.PlacedFootprint.Footprint.Depth = texMetaData.depth;
-	src.PlacedFootprint.Footprint.RowPitch = img->rowPitch;
-	src.PlacedFootprint.Footprint.Format = img->format;
+	{
+		// コピー元
+		D3D12_TEXTURE_COPY_LOCATION src = {};
+		src.pResource = uploadBuff;
+		src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+		src.PlacedFootprint.Offset = 0;
+		src.PlacedFootprint.Footprint.Width = texMetaData.width;
+		src.PlacedFootprint.Footprint.Height = texMetaData.height;
+		src.PlacedFootprint.Footprint.Depth = texMetaData.depth;
+		src.PlacedFootprint.Footprint.RowPitch = AlignmentedSize(img->rowPitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+		src.PlacedFootprint.Footprint.Format = img->format;
 
-	// コピー先
-	D3D12_TEXTURE_COPY_LOCATION dst = {};
-	dst.pResource = texBuff;
-	dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-	dst.SubresourceIndex = 0;
+		// コピー先
+		D3D12_TEXTURE_COPY_LOCATION dst = {};
+		dst.pResource = texBuff;
+		dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+		dst.SubresourceIndex = 0;
 
-	// コピーコマンド
-	_cmdList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+		// コピーコマンド
+		_cmdList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+		//result = texBuff->WriteToSubresource(0, nullptr, img->pixels, img->rowPitch, img->slicePitch);
 
-	D3D12_RESOURCE_BARRIER BarrierDesc;
-	BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	BarrierDesc.Transition.pResource = texBuff;
-	BarrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-	BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-	BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-	_cmdList->ResourceBarrier(1, &BarrierDesc);
-	_cmdList->Close();
-	
-	ID3D12CommandList* cmdLists[] = { _cmdList };
-	_cmdQueue->ExecuteCommandLists(1, cmdLists);
-	//result = texBuff->WriteToSubresource(0, nullptr, img->pixels, img->rowPitch, img->slicePitch);
+		D3D12_RESOURCE_BARRIER BarrierDesc;
+		BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		BarrierDesc.Transition.pResource = texBuff;
+		BarrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+		BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		_cmdList->ResourceBarrier(1, &BarrierDesc);
+		_cmdList->Close();
+
+		ID3D12CommandList* cmdLists[] = { _cmdList };
+		_cmdQueue->ExecuteCommandLists(1, cmdLists);
+		_cmdQueue->Signal(_fence, ++_fenceVal);
+		if (_fence->GetCompletedValue() != _fenceVal) {
+			auto event = CreateEvent(nullptr, false, false, nullptr);
+			_fence->SetEventOnCompletion(_fenceVal, event);
+			WaitForSingleObject(event, INFINITE);
+			CloseHandle(event);
+		}
+		_cmdAllocator->Reset();
+		_cmdList->Reset(_cmdAllocator, nullptr);
+	}
 
 	// シェーダーリソースビュー
 	ID3D12DescriptorHeap* texDescHeap = nullptr;
@@ -574,7 +596,7 @@ HRESULT CreateTextureResource(
 	D3D12_RESOURCE_DESC resDesc = {};
 	resDesc.Format = DXGI_FORMAT_UNKNOWN;
 	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resDesc.Width = pImg->slicePitch;
+	resDesc.Width = AlignmentedSize(pImg->rowPitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT) * pImg->height;
 	resDesc.Height = 1;
 	resDesc.DepthOrArraySize = 1;
 	resDesc.MipLevels = 1;
@@ -619,6 +641,10 @@ HRESULT CreateTextureResource(
 		IID_PPV_ARGS(ppTextureBuffer));
 }
 
+size_t AlignmentedSize(size_t size, size_t alignment)
+{
+	return size + alignment - size % alignment;
+}
 
 void EnableDebugLayer()
 {
