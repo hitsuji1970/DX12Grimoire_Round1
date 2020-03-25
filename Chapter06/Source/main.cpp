@@ -68,6 +68,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	};
 
 	HRESULT result = S_OK;
+
 #ifdef _DEBUG
 	EnableDebugLayer();
 	if (FAILED(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&_dxgiFactory)))) {
@@ -80,23 +81,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		return -1;
 	}
 #endif // _DEBUG
-
-#ifdef _DEBUG
-	std::vector<IDXGIAdapter*> adapters;
-	IDXGIAdapter* tmpAdapter = nullptr;
-	for (int i = 0; _dxgiFactory->EnumAdapters(i, &tmpAdapter) != DXGI_ERROR_NOT_FOUND; i++) {
-		adapters.push_back(tmpAdapter);
-	}
-	for (auto adpt : adapters) {
-		DXGI_ADAPTER_DESC adesc = {};
-		adpt->GetDesc(&adesc);
-		std::wstring strDesc = adesc.Description;
-		if (strDesc.find(L"NVIDIA") != std::string::npos) {
-			tmpAdapter = adpt;
-			break;
-		}
-	}
-#endif
 
 	D3D_FEATURE_LEVEL featureLevel;
 	for (auto lv : levels) {
@@ -195,13 +179,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	resdesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
 	// 頂点バッファー
-#if 0
-	ID3D12Resource* vertBuff = nullptr;
-	result = _dev->CreateCommittedResource(
-		&heapprop, D3D12_HEAP_FLAG_NONE,
-		&resdesc, D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr, IID_PPV_ARGS(&vertBuff));
-#endif
 	ID3D12Resource* vertBuff = nullptr;
 	result = _dev->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
@@ -239,7 +216,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	ibView.SizeInBytes = sizeof(indices);
 
 	// テクスチャーリソース
-	//const wchar_t* textureFileName = L"img/textest.png";
 	const wchar_t* textureFileName = L"img/textest200x200.png";
 	DirectX::TexMetadata texMetaData = {};
 	DirectX::ScratchImage scratchImg = {};
@@ -272,10 +248,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		src.pResource = uploadBuff;
 		src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
 		src.PlacedFootprint.Offset = 0;
-		src.PlacedFootprint.Footprint.Width = texMetaData.width;
-		src.PlacedFootprint.Footprint.Height = texMetaData.height;
-		src.PlacedFootprint.Footprint.Depth = texMetaData.depth;
-		src.PlacedFootprint.Footprint.RowPitch = AlignmentedSize(img->rowPitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+		src.PlacedFootprint.Footprint.Width = (UINT)texMetaData.width;
+		src.PlacedFootprint.Footprint.Height = (UINT)texMetaData.height;
+		src.PlacedFootprint.Footprint.Depth = (UINT)texMetaData.depth;
+		src.PlacedFootprint.Footprint.RowPitch = (UINT)AlignmentedSize(img->rowPitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
 		src.PlacedFootprint.Footprint.Format = img->format;
 
 		// コピー先
@@ -311,21 +287,48 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		_cmdList->Reset(_cmdAllocator, nullptr);
 	}
 
+	// 定数バッファーに行列を設定
+	auto matrix = DirectX::XMMatrixIdentity();
+	ID3D12Resource* constBuff = nullptr;
+	result = _dev->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(matrix) + 0xff) & ~0xff),
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&constBuff));
+
+	// 行列をコピー
+	DirectX::XMMATRIX* mapMatrix;
+	result = constBuff->Map(0, nullptr, (void**)&mapMatrix);
+	*mapMatrix = matrix;
+
 	// シェーダーリソースビュー
-	ID3D12DescriptorHeap* texDescHeap = nullptr;
+	ID3D12DescriptorHeap* basicDescHeap = nullptr;
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
 	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	descHeapDesc.NodeMask = 0;
-	descHeapDesc.NumDescriptors = 1;
-	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	result = _dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&texDescHeap));
 
+	// SRV1つとCBV1つ
+	descHeapDesc.NumDescriptors = 2;
+	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	result = _dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&basicDescHeap));
+	auto basicHeapHandle = basicDescHeap->GetCPUDescriptorHandleForHeapStart();
+
+	// シェーダーリソースビュー（テクスチャー）
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Format = texMetaData.format;
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MipLevels = 1;
-	_dev->CreateShaderResourceView(texBuff, &srvDesc, texDescHeap->GetCPUDescriptorHandleForHeapStart());
+	_dev->CreateShaderResourceView(texBuff, &srvDesc, basicHeapHandle);
+	basicHeapHandle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+	// シェーダーリソースビュー（定数バッファー）
+	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+	cbvDesc.BufferLocation = constBuff->GetGPUVirtualAddress();
+	cbvDesc.SizeInBytes = constBuff->GetDesc().Width;
+	_dev->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
 
 	// シェーダー
 	ID3DBlob* _vsBlob = nullptr;
@@ -392,17 +395,30 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		},
 	};
 
-	D3D12_DESCRIPTOR_RANGE descTblRange = {};
-	descTblRange.NumDescriptors = 1;
-	descTblRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descTblRange.BaseShaderRegister = 0;
-	descTblRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	D3D12_DESCRIPTOR_RANGE descTblRange[2] = {};
 
-	D3D12_ROOT_PARAMETER rootParam = {};
-	rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParam.DescriptorTable.pDescriptorRanges = &descTblRange;
-	rootParam.DescriptorTable.NumDescriptorRanges = 1;
+	// テクスチャー用レジスター0番
+	descTblRange[0].NumDescriptors = 1;
+	descTblRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descTblRange[0].BaseShaderRegister = 0;
+	descTblRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+	// 定数用レジスタ－1番
+	descTblRange[1].NumDescriptors = 1;
+	descTblRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	descTblRange[1].BaseShaderRegister = 0;
+	descTblRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+
+	D3D12_ROOT_PARAMETER rootParam[2] = {};
+	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParam[0].DescriptorTable.pDescriptorRanges = &descTblRange[0];
+	rootParam[0].DescriptorTable.NumDescriptorRanges = 1;
+	rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParam[1].DescriptorTable.pDescriptorRanges = &descTblRange[1];
+	rootParam[1].DescriptorTable.NumDescriptorRanges = 1;
+	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
 	// サンプラー設定
 	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
@@ -417,8 +433,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	D3D12_ROOT_SIGNATURE_DESC rootsignatureDesc = {};
 	rootsignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-	rootsignatureDesc.pParameters = &rootParam;
-	rootsignatureDesc.NumParameters = 1;
+	rootsignatureDesc.pParameters = rootParam;
+	rootsignatureDesc.NumParameters = 2;
 	rootsignatureDesc.pStaticSamplers = &samplerDesc;
 	rootsignatureDesc.NumStaticSamplers = 1;
 
@@ -518,9 +534,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		float clearColor[] = { 0.0f, 1.0f, 0.0f, 1.0f };
 		_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
 
+		auto heapHandle = basicDescHeap->GetGPUDescriptorHandleForHeapStart();
+
 		_cmdList->SetGraphicsRootSignature(rootSignature);
-		_cmdList->SetDescriptorHeaps(1, &texDescHeap);
-		_cmdList->SetGraphicsRootDescriptorTable(0, texDescHeap->GetGPUDescriptorHandleForHeapStart());
+		_cmdList->SetDescriptorHeaps(1, &basicDescHeap);
+		_cmdList->SetGraphicsRootDescriptorTable(0, heapHandle);
+		heapHandle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		_cmdList->SetGraphicsRootDescriptorTable(1, heapHandle);
 		_cmdList->SetPipelineState(_pipelineState);
 		_cmdList->RSSetViewports(1, &viewport);
 		_cmdList->RSSetScissorRects(1, &scissorRect);
@@ -644,10 +664,10 @@ HRESULT CreateTextureResource(
 	texHeapProp.VisibleNodeMask = 0;
 
 	resDesc.Format = texMetaData.format;
-	resDesc.Width = texMetaData.width;
-	resDesc.Height = texMetaData.height;
-	resDesc.DepthOrArraySize = texMetaData.arraySize;
-	resDesc.MipLevels = texMetaData.mipLevels;
+	resDesc.Width = (UINT)texMetaData.width;
+	resDesc.Height = (UINT)texMetaData.height;
+	resDesc.DepthOrArraySize = (UINT)texMetaData.arraySize;
+	resDesc.MipLevels = (UINT)texMetaData.mipLevels;
 	resDesc.Dimension = static_cast<D3D12_RESOURCE_DIMENSION>(texMetaData.dimension);
 	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
