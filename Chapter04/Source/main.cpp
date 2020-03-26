@@ -5,10 +5,7 @@
 #include <DirectXMath.h>
 #include <d3dcompiler.h>
 #include <vector>
-
-#ifdef _DEBUG
 #include <iostream>
-#endif
 
 using namespace DirectX;
 
@@ -47,7 +44,7 @@ void DebugOutputFromString(const char* format, ...)
 #ifdef _DEBUG
 int main()
 #else
-int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
+int APIENTRY _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 #endif
 {
 	DebugOutputFromString("Show window test.");

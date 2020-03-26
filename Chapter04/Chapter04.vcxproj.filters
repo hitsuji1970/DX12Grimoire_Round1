@@ -23,4 +23,7 @@
     <FxCompile Include="Source\BasicVertexShader.hlsl" />
     <FxCompile Include="Source\BasicPixelShader.hlsl" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="cpp.hint" />
+  </ItemGroup>
 </Project>

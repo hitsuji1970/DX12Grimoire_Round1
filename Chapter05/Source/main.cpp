@@ -52,7 +52,7 @@ struct TexRGBA
 #ifdef _DEBUG
 int main()
 #else
-int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
+int APIENTRY _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 #endif
 {
 	DebugOutputFromString("Show window test.");

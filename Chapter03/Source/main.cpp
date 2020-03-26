@@ -37,7 +37,7 @@ void DebugOutputFromString(const char* format, ...)
 #ifdef _DEBUG
 int main()
 #else
-int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
+int APIENTRY _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 #endif
 {
 	DebugOutputFromString("Show window test.");
@@ -137,7 +137,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	// スワップチェーンに関連付け
 	std::vector<ID3D12Resource*> _backBuffers(swapChainDesc.BufferCount);
 	D3D12_CPU_DESCRIPTOR_HANDLE cpuDescHandle = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
-	for (int idx = 0; idx < swapChainDesc.BufferCount; ++idx) {
+	for (UINT idx = 0; idx < swapChainDesc.BufferCount; ++idx) {
 		result = _swapchain->GetBuffer(idx, IID_PPV_ARGS(&_backBuffers[idx]));
 		_dev->CreateRenderTargetView(_backBuffers[idx], nullptr, cpuDescHandle);
 		cpuDescHandle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);

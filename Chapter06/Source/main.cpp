@@ -52,7 +52,7 @@ struct TexRGBA
 #ifdef _DEBUG
 int main()
 #else
-int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
+int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 #endif
 {
 	DebugOutputFromString("Show window test.");
@@ -91,7 +91,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	}
 
 	if (!_dev) {
-		::MessageBox(hWnd, _T("Error"), _T("D3Dデバイスの初期化に失敗しました。"), MB_ICONERROR);
+		::MessageBox(hWnd, TEXT("Error"), TEXT("D3Dデバイスの初期化に失敗しました。"), MB_ICONERROR);
 		exit(-1);
 	}
 
@@ -581,7 +581,7 @@ HWND InitWindow(WNDCLASSEX* const pWndClass)
 	DebugOutputFromString("Show window test.");
 	pWndClass->cbSize = sizeof(WNDCLASSEX);
 	pWndClass->lpfnWndProc = WNDPROC(WindowProcedure);
-	pWndClass->lpszClassName = _T("DX12Sample");
+	pWndClass->lpszClassName = TEXT("DX12Sample");
 	pWndClass->hInstance = GetModuleHandle(nullptr);
 
 	RegisterClassEx(pWndClass);
@@ -590,7 +590,7 @@ HWND InitWindow(WNDCLASSEX* const pWndClass)
 	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);
 
 	HWND hWnd = CreateWindow(pWndClass->lpszClassName,
-		_T("DX12テスト"),
+		TEXT("DX12テスト"),
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
