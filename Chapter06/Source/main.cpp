@@ -151,10 +151,14 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	// 頂点リソース
 	Vertex vertices[] = {
-		{{-0.4f, -0.7f, 0.0f}, {0.0f, 1.0f}}, // 0:左下
-		{{-0.4f,  0.7f, 0.0f}, {0.0f, 0.0f}}, // 1:左上
-		{{ 0.4f, -0.7f, 0.0f}, {1.0f, 1.0f}}, // 2:右下
-		{{ 0.4f,  0.7f, 0.0f}, {1.0f, 0.0f}}, // 3:右上
+		//{{-0.4f, -0.7f, 0.0f}, {0.0f, 1.0f}}, // 0:左下
+		//{{-0.4f,  0.7f, 0.0f}, {0.0f, 0.0f}}, // 1:左上
+		//{{ 0.4f, -0.7f, 0.0f}, {1.0f, 1.0f}}, // 2:右下
+		//{{ 0.4f,  0.7f, 0.0f}, {1.0f, 0.0f}}, // 3:右上
+		{{  0.0f, 100.0f, 0.0f}, {0.0f, 1.0f}}, // 左下
+		{{  0.0f,   0.0f, 0.0f}, {0.0f, 0.0f}}, // 左上
+		{{100.0f, 100.0f, 0.0f}, {1.0f, 1.0f}}, // 右下
+		{{100.0f,   0.0f, 0.0f}, {1.0f, 0.0f}}  // 右上
 	};
 
 	unsigned short indices[] = {
@@ -273,6 +277,10 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	// 定数バッファーに行列を設定
 	auto matrix = DirectX::XMMatrixIdentity();
+	matrix.r[0].m128_f32[0] = 2.0f / window_width;
+	matrix.r[1].m128_f32[1] = -2.0f / window_height;
+	matrix.r[3].m128_f32[0] = -1.0f;
+	matrix.r[3].m128_f32[1] = 1.0f;
 	ID3D12Resource* constBuff = nullptr;
 	result = _dev->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
