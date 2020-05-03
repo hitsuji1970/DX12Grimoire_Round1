@@ -151,14 +151,21 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 	// 頂点リソース
 	Vertex vertices[] = {
+		// 2D（ビューポート直接)
 		//{{-0.4f, -0.7f, 0.0f}, {0.0f, 1.0f}}, // 0:左下
 		//{{-0.4f,  0.7f, 0.0f}, {0.0f, 0.0f}}, // 1:左上
 		//{{ 0.4f, -0.7f, 0.0f}, {1.0f, 1.0f}}, // 2:右下
 		//{{ 0.4f,  0.7f, 0.0f}, {1.0f, 0.0f}}, // 3:右上
-		{{  0.0f, 100.0f, 0.0f}, {0.0f, 1.0f}}, // 左下
-		{{  0.0f,   0.0f, 0.0f}, {0.0f, 0.0f}}, // 左上
-		{{100.0f, 100.0f, 0.0f}, {1.0f, 1.0f}}, // 右下
-		{{100.0f,   0.0f, 0.0f}, {1.0f, 0.0f}}  // 右上
+		// 2D（座標変換）
+		//{{  0.0f, 100.0f, 0.0f}, {0.0f, 1.0f}}, // 左下
+		//{{  0.0f,   0.0f, 0.0f}, {0.0f, 0.0f}}, // 左上
+		//{{100.0f, 100.0f, 0.0f}, {1.0f, 1.0f}}, // 右下
+		//{{100.0f,   0.0f, 0.0f}, {1.0f, 0.0f}}  // 右上
+		// 3D
+		{{-1.0f, -1.0f, 0.0f}, {0.0f, 1.0f}}, // 左下
+		{{-1.0f,  1.0f, 0.0f}, {0.0f, 0.0f}}, // 左上
+		{{ 1.0f, -1.0f, 0.0f}, {1.0f, 1.0f}}, // 右下
+		{{ 1.0f,  1.0f, 0.0f}, {1.0f, 0.0f}}, // 右上
 	};
 
 	unsigned short indices[] = {
@@ -276,16 +283,27 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	}
 
 	// 定数バッファーに行列を設定
-	auto matrix = DirectX::XMMatrixIdentity();
+	// 2D
+/*	auto matrix = DirectX::XMMatrixIdentity();
 	matrix.r[0].m128_f32[0] = 2.0f / window_width;
 	matrix.r[1].m128_f32[1] = -2.0f / window_height;
 	matrix.r[3].m128_f32[0] = -1.0f;
 	matrix.r[3].m128_f32[1] = 1.0f;
+*/
+	
+	auto worldMatrix = DirectX::XMMatrixRotationY(DirectX::XM_PIDIV4);
+	DirectX::XMFLOAT3 eye(0, 0, -5);
+	DirectX::XMFLOAT3 target(0, 0, 0);
+	DirectX::XMFLOAT3 up(0, 1, 0);
+
+	auto viewMatrix = DirectX::XMMatrixLookAtLH(DirectX::XMLoadFloat3(&eye), DirectX::XMLoadFloat3(&target), DirectX::XMLoadFloat3(&up));
+	auto projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV2, static_cast<float>(window_width) / window_height, 1.0f, 10.f);
+
 	ID3D12Resource* constBuff = nullptr;
 	result = _dev->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(matrix) + 0xff) & ~0xff),
+		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(DirectX::XMMATRIX) + 0xff) & ~0xff),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&constBuff));
@@ -293,7 +311,6 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	// 行列をコピー
 	DirectX::XMMATRIX* mapMatrix;
 	result = constBuff->Map(0, nullptr, (void**)&mapMatrix);
-	*mapMatrix = matrix;
 
 	// シェーダーリソースビュー
 	ID3D12DescriptorHeap* basicDescHeap = nullptr;
@@ -489,6 +506,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	scissorRect.bottom = scissorRect.top + window_height;
 
 	MSG msg = {};
+	auto angle = 0.0f;
 
 	while (true) {
 		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
@@ -536,6 +554,10 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 		_cmdList->SetDescriptorHeaps(1, &basicDescHeap);
 		_cmdList->SetGraphicsRootDescriptorTable(0, basicDescHeap->GetGPUDescriptorHandleForHeapStart());
 		_cmdList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+
+		angle += 0.1f;
+		worldMatrix = DirectX::XMMatrixRotationY(angle);
+		*mapMatrix = worldMatrix * viewMatrix * projectionMatrix;
 
 #if 0
 		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
