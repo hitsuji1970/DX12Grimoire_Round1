@@ -3,142 +3,146 @@
 #include <Windows.h>
 #include <string>
 
-// PMDヘッダー構造体
-struct PMDHeader {
-	float version;			// 例 : 00 00 80 3F == 1.00
-	char model_name[20];	// モデル名
-	char comment[256];		// モデルコメント
-};
-
-// PMD頂点構造体
-struct PMDVertex
+namespace pmd
 {
-	DirectX::XMFLOAT3 pos;
-	DirectX::XMFLOAT3 normal;
-	DirectX::XMFLOAT2 uv;
-	unsigned short boneNo[2];
-	unsigned char boneWeight;
-	unsigned char endflg;
-};
+	// PMDヘッダー構造体
+	struct PMDHeader {
+		float version;			// 例 : 00 00 80 3F == 1.00
+		char model_name[20];	// モデル名
+		char comment[256];		// モデルコメント
+	};
 
-// PMDマテリアル構造体
+	// PMD頂点構造体
+	struct Vertex
+	{
+		DirectX::XMFLOAT3 pos;
+		DirectX::XMFLOAT3 normal;
+		DirectX::XMFLOAT2 uv;
+		unsigned short boneNo[2];
+		unsigned char boneWeight;
+		unsigned char endflg;
+	};
+
+	// PMDマテリアル構造体
 #pragma pack(1)
-struct SerializedPMDMaterial
-{
-	DirectX::XMFLOAT3 diffuse;
-	float alpha;
-	float specularity;
-	DirectX::XMFLOAT3 specular;
-	DirectX::XMFLOAT3 ambient;
-	unsigned char toonIdx;
-	unsigned char edgeFlg;
-	// パディング2bytesが入る
-	unsigned int indicesNum;
-	char texFilePath[20];
-};
+	struct SerializedMaterial
+	{
+		DirectX::XMFLOAT3 diffuse;
+		float alpha;
+		float specularity;
+		DirectX::XMFLOAT3 specular;
+		DirectX::XMFLOAT3 ambient;
+		unsigned char toonIdx;
+		unsigned char edgeFlg;
+		// パディング2bytesが入る
+		unsigned int indicesNum;
+		char texFilePath[20];
+	};
 #pragma pack()
 
-struct BasicMatrial
-{
-	DirectX::XMFLOAT3 diffuse;
-	float alpha;
-	DirectX::XMFLOAT3 specular;
-	float specularity;
-	DirectX::XMFLOAT3 ambient;
-};
-
-struct AdditionalMaterial
-{
-	std::string texPath;
-	int toonIdx;
-	bool edgeFlg;
-};
-
-struct Material
-{
-	unsigned int indicesNum;
-	BasicMatrial material;
-	AdditionalMaterial additional;
-};
-
-class PMDMesh
-{
-public:
-	// 頂点データのサイズ
-	static const size_t VERTEX_SIZE = 38;
-
-	PMDMesh();
-	virtual ~PMDMesh();
-
-	HRESULT LoadFromFile(ID3D12Device* const pD3D12Device, LPCTSTR filename);
-
-	unsigned int GetNumberOfVertex()
+	struct BasicMatrial
 	{
-		return m_numberOfVertex;
-	}
+		DirectX::XMFLOAT3 diffuse;
+		float alpha;
+		DirectX::XMFLOAT3 specular;
+		float specularity;
+		DirectX::XMFLOAT3 ambient;
+	};
 
-	unsigned int GetNumberOfIndex()
+	struct AdditionalMaterial
 	{
-		return m_numberOfIndex;
-	}
+		std::string texPath;
+		int toonIdx;
+		bool edgeFlg;
+	};
 
-	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const
+	struct Material
 	{
-		return m_vertexBufferView;
-	}
+		unsigned int indicesNum;
+		BasicMatrial material;
+		AdditionalMaterial additional;
+	};
 
-	const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferView() const
+	class PMDMesh
 	{
-		return m_indexBufferView;
-	}
+	public:
+		// 頂点データのサイズ
+		static const size_t VERTEX_SIZE = 38;
 
-	ID3D12DescriptorHeap* GetMaterialDescriptorHeap()
-	{
-		return m_pMaterialDescHeap;
-	}
+		PMDMesh();
+		virtual ~PMDMesh();
 
-	const std::vector<Material>& GetMaterials() const
-	{
-		return m_materials;
-	}
+		HRESULT LoadFromFile(ID3D12Device* const pD3D12Device, LPCTSTR filename);
 
-private:
-	// シグネチャー情報
-	char m_signature[3];
+		unsigned int GetNumberOfVertex()
+		{
+			return m_numberOfVertex;
+		}
 
-	// ヘッダー情報
-	PMDHeader m_header;
+		unsigned int GetNumberOfIndex()
+		{
+			return m_numberOfIndex;
+		}
 
-	// 頂点数
-	unsigned int m_numberOfVertex;
+		const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const
+		{
+			return m_vertexBufferView;
+		}
 
-	// 頂点バッファー
-	ID3D12Resource* m_pVertexBuffer;
+		const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferView() const
+		{
+			return m_indexBufferView;
+		}
 
-	// 頂点バッファービュー
-	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
+		ID3D12DescriptorHeap* GetMaterialDescriptorHeap()
+		{
+			return m_pMaterialDescHeap;
+		}
 
-	// インデックスの数
-	unsigned int m_numberOfIndex;
+		const std::vector<Material>& GetMaterials() const
+		{
+			return m_materials;
+		}
 
-	// インデックスバッファー
-	ID3D12Resource* m_pIndexBuffer;
+	private:
+		// シグネチャー情報
+		char m_signature[3];
 
-	// インデックスバッファービュー
-	D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
+		// ヘッダー情報
+		PMDHeader m_header;
 
-	// マテリアルの数
-	unsigned int m_numberOfMaterial;
+		// 頂点数
+		unsigned int m_numberOfVertex;
 
-	// マテリアルバッファー
-	ID3D12Resource* m_pMaterialBuffer;
+		// 頂点バッファー
+		ID3D12Resource* m_pVertexBuffer;
 
-	// マテリアルディスクリプターヒープ
-	ID3D12DescriptorHeap* m_pMaterialDescHeap;
+		// 頂点バッファービュー
+		D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
 
-	// マテリアル実体
-	std::vector<Material> m_materials;
+		// インデックスの数
+		unsigned int m_numberOfIndex;
 
-private:
-	void ClearResources();
-};
+		// インデックスバッファー
+		ID3D12Resource* m_pIndexBuffer;
+
+		// インデックスバッファービュー
+		D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
+
+		// マテリアルの数
+		unsigned int m_numberOfMaterial;
+
+		// マテリアルバッファー
+		ID3D12Resource* m_pMaterialBuffer;
+
+		// マテリアルディスクリプターヒープ
+		ID3D12DescriptorHeap* m_pMaterialDescHeap;
+
+		// マテリアル実体
+		std::vector<Material> m_materials;
+
+	private:
+		void ClearResources();
+	};
+
+} // namespace pmd

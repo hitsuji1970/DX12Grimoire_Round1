@@ -144,7 +144,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 
 	ShowWindow(hWnd, SW_SHOW);
 
-	PMDMesh mesh;
+	pmd::PMDMesh mesh;
 	result = mesh.LoadFromFile(_dev, TEXT("model/初音ミク.pmd"));
 
 	// 深度バッファー
