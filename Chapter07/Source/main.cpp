@@ -12,6 +12,8 @@
 #include <iostream>
 #endif
 
+#include "pmd.h"
+
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
@@ -150,50 +152,49 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	ShowWindow(hWnd, SW_SHOW);
 
 	// 頂点リソース
-	Vertex vertices[] = {
-		// 2D（ビューポート直接)
-		//{{-0.4f, -0.7f, 0.0f}, {0.0f, 1.0f}}, // 0:左下
-		//{{-0.4f,  0.7f, 0.0f}, {0.0f, 0.0f}}, // 1:左上
-		//{{ 0.4f, -0.7f, 0.0f}, {1.0f, 1.0f}}, // 2:右下
-		//{{ 0.4f,  0.7f, 0.0f}, {1.0f, 0.0f}}, // 3:右上
-		// 2D（座標変換）
-		//{{  0.0f, 100.0f, 0.0f}, {0.0f, 1.0f}}, // 左下
-		//{{  0.0f,   0.0f, 0.0f}, {0.0f, 0.0f}}, // 左上
-		//{{100.0f, 100.0f, 0.0f}, {1.0f, 1.0f}}, // 右下
-		//{{100.0f,   0.0f, 0.0f}, {1.0f, 0.0f}}  // 右上
-		// 3D
-		{{-1.0f, -1.0f, 0.0f}, {0.0f, 1.0f}}, // 左下
-		{{-1.0f,  1.0f, 0.0f}, {0.0f, 0.0f}}, // 左上
-		{{ 1.0f, -1.0f, 0.0f}, {1.0f, 1.0f}}, // 右下
-		{{ 1.0f,  1.0f, 0.0f}, {1.0f, 0.0f}}, // 右上
-	};
-
 	unsigned short indices[] = {
 		0, 1, 2,
 		2, 1, 3,
 	};
 
 	// 頂点バッファー
-	auto heapprop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-	auto resDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(vertices));
+	constexpr size_t pmdvertex_size = 38;
+	FILE* fp;
+	_tfopen_s(&fp, TEXT("model/初音ミク.pmd"), TEXT("rb"));
+
+	char signature[3] = {};
+	PMDHeader pmdHeader;
+	fread(signature, sizeof(signature), 1, fp);
+	fread(&pmdHeader, sizeof(pmdHeader), 1, fp);
+
+	unsigned int vertNum;
+	fread(&vertNum, sizeof(vertNum), 1, fp);
+
+	std::vector<unsigned char> vertices(vertNum * pmdvertex_size);
+	fread(vertices.data(), vertices.size(), 1, fp);
+
+	fclose(fp);
+
 
 	ID3D12Resource* vertBuff = nullptr;
 	result = _dev->CreateCommittedResource(
-		&heapprop, D3D12_HEAP_FLAG_NONE,
-		&resDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(vertices.size()), D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr, IID_PPV_ARGS(&vertBuff));
 
-	Vertex* vertMap = nullptr;
+	unsigned char* vertMap = nullptr;
 	result = vertBuff->Map(0, nullptr, (void**)&vertMap);
 	std::copy(std::begin(vertices), std::end(vertices), vertMap);
 	vertBuff->Unmap(0, nullptr);
 
 	D3D12_VERTEX_BUFFER_VIEW vbView = {};
 	vbView.BufferLocation = vertBuff->GetGPUVirtualAddress();
-	vbView.SizeInBytes = sizeof(vertices);
-	vbView.StrideInBytes = sizeof(vertices[0]);
+	vbView.SizeInBytes = vertices.size();
+	vbView.StrideInBytes = pmdvertex_size;
 
 	// インデックスバッファー
+	auto heapprop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+	auto resDesc = CD3DX12_RESOURCE_DESC::Buffer(vertices.size());
 	ID3D12Resource* idxBuff = nullptr;
 	result = _dev->CreateCommittedResource(
 		&heapprop, D3D12_HEAP_FLAG_NONE,
@@ -283,21 +284,13 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	}
 
 	// 定数バッファーに行列を設定
-	// 2D
-/*	auto matrix = DirectX::XMMatrixIdentity();
-	matrix.r[0].m128_f32[0] = 2.0f / window_width;
-	matrix.r[1].m128_f32[1] = -2.0f / window_height;
-	matrix.r[3].m128_f32[0] = -1.0f;
-	matrix.r[3].m128_f32[1] = 1.0f;
-*/
-	
 	auto worldMatrix = DirectX::XMMatrixRotationY(DirectX::XM_PIDIV4);
-	DirectX::XMFLOAT3 eye(0, 0, -5);
-	DirectX::XMFLOAT3 target(0, 0, 0);
+	DirectX::XMFLOAT3 eye(0, 10, -15);
+	DirectX::XMFLOAT3 target(0, 10, 0);
 	DirectX::XMFLOAT3 up(0, 1, 0);
 
 	auto viewMatrix = DirectX::XMMatrixLookAtLH(DirectX::XMLoadFloat3(&eye), DirectX::XMLoadFloat3(&target), DirectX::XMLoadFloat3(&up));
-	auto projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV2, static_cast<float>(window_width) / window_height, 1.0f, 10.f);
+	auto projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV2, static_cast<float>(window_width) / static_cast<float>(window_height), 1.0f, 1000.f);
 
 	ID3D12Resource* constBuff = nullptr;
 	result = _dev->CreateCommittedResource(
@@ -393,13 +386,33 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	// 頂点レイアウト
 	D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
 		{ // 座標
-			"Position", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
+			"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
+			D3D12_APPEND_ALIGNED_ELEMENT,
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
+		},
+		{ // 法線
+			"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
 			D3D12_APPEND_ALIGNED_ELEMENT,
 			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
 		},
 		{ // UV
-			"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,
-			0, D3D12_APPEND_ALIGNED_ELEMENT,
+			"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0,
+			D3D12_APPEND_ALIGNED_ELEMENT,
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
+		},
+		{
+			"BONE_NO", 0, DXGI_FORMAT_R16G16_UINT, 0,
+			D3D12_APPEND_ALIGNED_ELEMENT,
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
+		},
+		{
+			"WEIGHT", 0, DXGI_FORMAT_R8_UINT, 0,
+			D3D12_APPEND_ALIGNED_ELEMENT,
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
+		},
+		{
+			"EDGE_FLAG", 0, DXGI_FORMAT_R8_UINT, 0,
+			D3D12_APPEND_ALIGNED_ELEMENT,
 			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
 		},
 	};
@@ -539,7 +552,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		rtvH.ptr += bbIdx * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 		_cmdList->OMSetRenderTargets(1, &rtvH, true, nullptr);
 
-		float clearColor[] = { 0.0f, 1.0f, 0.0f, 1.0f };
+		float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 		_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
 
 		_cmdList->RSSetViewports(1, &viewport);
@@ -553,9 +566,8 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		_cmdList->SetGraphicsRootSignature(rootSignature);
 		_cmdList->SetDescriptorHeaps(1, &basicDescHeap);
 		_cmdList->SetGraphicsRootDescriptorTable(0, basicDescHeap->GetGPUDescriptorHandleForHeapStart());
-		_cmdList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+		_cmdList->DrawInstanced(vertNum, 1, 0, 0);
 
-		angle += 0.1f;
 		worldMatrix = DirectX::XMMatrixRotationY(angle);
 		*mapMatrix = worldMatrix * viewMatrix * projectionMatrix;
 
