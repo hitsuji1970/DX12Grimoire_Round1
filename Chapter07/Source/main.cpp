@@ -151,12 +151,6 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 
 	ShowWindow(hWnd, SW_SHOW);
 
-	// 頂点リソース
-	unsigned short indices[] = {
-		0, 1, 2,
-		2, 1, 3,
-	};
-
 	// 頂点バッファー
 	constexpr size_t pmdvertex_size = 38;
 	FILE* fp;
@@ -169,12 +163,8 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 
 	unsigned int vertNum;
 	fread(&vertNum, sizeof(vertNum), 1, fp);
-
 	std::vector<unsigned char> vertices(vertNum * pmdvertex_size);
 	fread(vertices.data(), vertices.size(), 1, fp);
-
-	fclose(fp);
-
 
 	ID3D12Resource* vertBuff = nullptr;
 	result = _dev->CreateCommittedResource(
@@ -193,12 +183,19 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	vbView.StrideInBytes = pmdvertex_size;
 
 	// インデックスバッファー
-	auto heapprop = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-	auto resDesc = CD3DX12_RESOURCE_DESC::Buffer(vertices.size());
+	std::vector<unsigned short> indices;
+	unsigned int indicesNum;
+	fread(&indicesNum, sizeof(indicesNum), 1, fp);
+	indices.resize(indicesNum);
+	fread(indices.data(), indices.size() * sizeof(indices[0]), 1, fp);
+
+	fclose(fp);
+
+	// インデックスバッファー
 	ID3D12Resource* idxBuff = nullptr;
 	result = _dev->CreateCommittedResource(
-		&heapprop, D3D12_HEAP_FLAG_NONE,
-		&resDesc, D3D12_RESOURCE_STATE_GENERIC_READ,
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(indices.size() * sizeof(indices[0])), D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr, IID_PPV_ARGS(&idxBuff));
 
 	unsigned short* mappedIndex = nullptr;
@@ -209,7 +206,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	D3D12_INDEX_BUFFER_VIEW ibView = {};
 	ibView.BufferLocation = idxBuff->GetGPUVirtualAddress();
 	ibView.Format = DXGI_FORMAT_R16_UINT;
-	ibView.SizeInBytes = sizeof(indices);
+	ibView.SizeInBytes = indices.size() * sizeof(indices[0]);
 
 	// テクスチャーリソース
 	const wchar_t* textureFileName = L"img/textest200x200.png";
@@ -559,14 +556,14 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		_cmdList->RSSetScissorRects(1, &scissorRect);
 		_cmdList->SetGraphicsRootSignature(rootSignature);
 
-		_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
+		_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		_cmdList->IASetVertexBuffers(0, 1, &vbView);
 		_cmdList->IASetIndexBuffer(&ibView);
 
 		_cmdList->SetGraphicsRootSignature(rootSignature);
 		_cmdList->SetDescriptorHeaps(1, &basicDescHeap);
 		_cmdList->SetGraphicsRootDescriptorTable(0, basicDescHeap->GetGPUDescriptorHandleForHeapStart());
-		_cmdList->DrawInstanced(vertNum, 1, 0, 0);
+		_cmdList->DrawIndexedInstanced(indicesNum, 1, 0, 0, 0);
 
 		worldMatrix = DirectX::XMMatrixRotationY(angle);
 		*mapMatrix = worldMatrix * viewMatrix * projectionMatrix;
