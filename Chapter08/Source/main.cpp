@@ -279,40 +279,6 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		}
 	}
 
-	// 頂点レイアウト
-	D3D12_INPUT_ELEMENT_DESC inputLayout[] = {
-		{ // 座標
-			"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
-			D3D12_APPEND_ALIGNED_ELEMENT,
-			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
-		},
-		{ // 法線
-			"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
-			D3D12_APPEND_ALIGNED_ELEMENT,
-			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
-		},
-		{ // UV
-			"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0,
-			D3D12_APPEND_ALIGNED_ELEMENT,
-			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
-		},
-		{
-			"BONE_NO", 0, DXGI_FORMAT_R16G16_UINT, 0,
-			D3D12_APPEND_ALIGNED_ELEMENT,
-			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
-		},
-		{
-			"WEIGHT", 0, DXGI_FORMAT_R8_UINT, 0,
-			D3D12_APPEND_ALIGNED_ELEMENT,
-			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
-		},
-		{
-			"EDGE_FLAG", 0, DXGI_FORMAT_R8_UINT, 0,
-			D3D12_APPEND_ALIGNED_ELEMENT,
-			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0
-		},
-	};
-
 	D3D12_DESCRIPTOR_RANGE descTblRanges[2] = {};
 
 	// 変換行列用レジスター0番
@@ -395,9 +361,8 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	renderTargetBlendDesc.LogicOpEnable = false;
 	renderTargetBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 	pipelineStateDesc.BlendState.RenderTarget[0] = renderTargetBlendDesc;
-
-	pipelineStateDesc.InputLayout.pInputElementDescs = inputLayout;
-	pipelineStateDesc.InputLayout.NumElements = _countof(inputLayout);
+	pipelineStateDesc.InputLayout.pInputElementDescs = pmd::PMDMesh::INPUT_LAYOUT.data();
+	pipelineStateDesc.InputLayout.NumElements = pmd::PMDMesh::INPUT_LAYOUT.size();
 	pipelineStateDesc.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
 	pipelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	pipelineStateDesc.NumRenderTargets = 1;
