@@ -313,19 +313,29 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		},
 	};
 
-	D3D12_DESCRIPTOR_RANGE descTblRange[2] = {};
+	D3D12_DESCRIPTOR_RANGE descTblRanges[2] = {};
 
 	// 変換行列用レジスター0番
-	descTblRange[0].NumDescriptors = 1;
-	descTblRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descTblRange[0].BaseShaderRegister = 0;
-	descTblRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	descTblRanges[0].NumDescriptors = 1;
+	descTblRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	descTblRanges[0].BaseShaderRegister = 0;
+	descTblRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	D3D12_ROOT_PARAMETER rootParam = {};
-	rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParam.DescriptorTable.pDescriptorRanges = descTblRange;
-	rootParam.DescriptorTable.NumDescriptorRanges = 1;
-	rootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	// マテリアル用レジスター1番
+	descTblRanges[1].NumDescriptors = 1;
+	descTblRanges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	descTblRanges[1].BaseShaderRegister = 1;
+	descTblRanges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+	D3D12_ROOT_PARAMETER rootParams[2] = {};
+	rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParams[0].DescriptorTable.pDescriptorRanges = &descTblRanges[0];
+	rootParams[0].DescriptorTable.NumDescriptorRanges = 1;
+	rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParams[1].DescriptorTable.pDescriptorRanges = &descTblRanges[1];
+	rootParams[1].DescriptorTable.NumDescriptorRanges = 1;
+	rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 	// サンプラー設定
 	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
@@ -340,8 +350,8 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 
 	D3D12_ROOT_SIGNATURE_DESC rootsignatureDesc = {};
 	rootsignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-	rootsignatureDesc.pParameters = &rootParam;
-	rootsignatureDesc.NumParameters = 1;
+	rootsignatureDesc.pParameters = rootParams;
+	rootsignatureDesc.NumParameters = 2;
 	rootsignatureDesc.pStaticSamplers = &samplerDesc;
 	rootsignatureDesc.NumStaticSamplers = 1;
 
@@ -452,6 +462,11 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		_cmdList->SetGraphicsRootSignature(rootSignature);
 		_cmdList->SetDescriptorHeaps(1, &basicDescHeap);
 		_cmdList->SetGraphicsRootDescriptorTable(0, basicDescHeap->GetGPUDescriptorHandleForHeapStart());
+
+		ID3D12DescriptorHeap* materialDescHeap[] = { mesh.GetMaterialDescriptorHeap() };
+		_cmdList->SetDescriptorHeaps(1, materialDescHeap);
+		_cmdList->SetGraphicsRootDescriptorTable(1, materialDescHeap[0]->GetGPUDescriptorHandleForHeapStart());
+
 		_cmdList->DrawIndexedInstanced(mesh.GetNumberOfIndex(), 1, 0, 0, 0);
 
 		angle += 0.01f;

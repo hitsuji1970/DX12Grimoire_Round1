@@ -1,4 +1,4 @@
-#include <d3dx12.h>
+﻿#include <d3dx12.h>
 #include <tchar.h>
 #include <iostream>
 #include <Windows.h>
@@ -27,6 +27,7 @@ HRESULT PMDMesh::LoadFromFile(ID3D12Device* const pD3D12Device, LPCTSTR cpFileNa
 		return E_FAIL;
 	}
 
+	// シグネチャーとヘッダー情報
 	std::fread(m_signature, sizeof(m_signature), 1, fp);
 	std::fread(&m_header, sizeof(m_header), 1, fp);
 
@@ -90,6 +91,65 @@ HRESULT PMDMesh::LoadFromFile(ID3D12Device* const pD3D12Device, LPCTSTR cpFileNa
 	m_indexBufferView.BufferLocation = m_pIndexBuffer->GetGPUVirtualAddress();
 	m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
 	m_indexBufferView.SizeInBytes = static_cast<UINT>(rawIndices.size() * sizeof(rawIndices[0]));
+
+	// マテリアルの読み込み
+	fread(&m_numberOfMaterial, sizeof(m_numberOfMaterial), 1, fp);
+	std::vector<SerializedPMDMaterial> serializedMaterials(m_numberOfMaterial);
+	fread(serializedMaterials.data(), serializedMaterials.size() * sizeof(SerializedPMDMaterial), 1, fp);
+
+	std::vector<Material> materials(m_numberOfMaterial);
+	for (int i = 0; i < serializedMaterials.size(); i++) {
+		materials[i].indicesNum = serializedMaterials[i].indicesNum;
+		materials[i].material.diffuse = serializedMaterials[i].diffuse;
+		materials[i].material.alpha = serializedMaterials[i].alpha;
+		materials[i].material.specular = serializedMaterials[i].specular;
+		materials[i].material.specularity = serializedMaterials[i].specularity;
+		materials[i].material.ambient = serializedMaterials[i].ambient;
+	}
+
+	auto materialBufferSize = sizeof(BasicMatrial);
+	materialBufferSize = (materialBufferSize + 0xff) & ~0xff;
+	result = pD3D12Device->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+		D3D12_HEAP_FLAG_NONE,
+		&CD3DX12_RESOURCE_DESC::Buffer(materialBufferSize * m_numberOfMaterial),
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr, IID_PPV_ARGS(&m_pMaterialBuffer)
+	);
+	if (FAILED(result)) {
+		std::fclose(fp);
+		ClearResources();
+		return result;
+	}
+
+	unsigned char* mappedMaterial = nullptr;
+	result = m_pMaterialBuffer->Map(0, nullptr, (void**)&mappedMaterial);
+	for (auto& m : materials) {
+		*reinterpret_cast<BasicMatrial*>(mappedMaterial) = m.material;
+		mappedMaterial += materialBufferSize;
+	}
+
+	D3D12_DESCRIPTOR_HEAP_DESC matDescHeapDesc = {};
+	matDescHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	matDescHeapDesc.NodeMask = 0;
+	matDescHeapDesc.NumDescriptors = m_numberOfMaterial;
+	matDescHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	result = pD3D12Device->CreateDescriptorHeap(&matDescHeapDesc, IID_PPV_ARGS(&m_pMaterialDescHeap));
+	if (FAILED(result)) {
+		std::fclose(fp);
+		ClearResources();
+		return result;
+	}
+
+	D3D12_CONSTANT_BUFFER_VIEW_DESC matCBVDesc = {};
+	matCBVDesc.BufferLocation = m_pMaterialBuffer->GetGPUVirtualAddress();
+	matCBVDesc.SizeInBytes = static_cast<UINT>(materialBufferSize);
+	auto matDescHeapH = m_pMaterialDescHeap->GetCPUDescriptorHandleForHeapStart();
+	for (auto i = 0u; i < m_numberOfMaterial; i++) {
+		pD3D12Device->CreateConstantBufferView(&matCBVDesc, matDescHeapH);
+		matDescHeapH.ptr += pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		matCBVDesc.BufferLocation += materialBufferSize;
+	}
 
 	std::fclose(fp);
 	return S_OK;

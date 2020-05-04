@@ -1,6 +1,7 @@
-#include <d3d12.h>
+﻿#include <d3d12.h>
 #include <DirectXMath.h>
 #include <Windows.h>
+#include <string>
 
 // PMDヘッダー構造体
 struct PMDHeader {
@@ -22,11 +23,11 @@ struct PMDVertex
 
 // PMDマテリアル構造体
 #pragma pack(1)
-struct PMDMaterial
+struct SerializedPMDMaterial
 {
 	DirectX::XMFLOAT3 diffuse;
 	float alpha;
-	float specurarity;
+	float specularity;
 	DirectX::XMFLOAT3 specular;
 	DirectX::XMFLOAT3 ambient;
 	unsigned char toonIdx;
@@ -36,6 +37,29 @@ struct PMDMaterial
 	char texFilePath[20];
 };
 #pragma pack()
+
+struct BasicMatrial
+{
+	DirectX::XMFLOAT3 diffuse;
+	float alpha;
+	DirectX::XMFLOAT3 specular;
+	float specularity;
+	DirectX::XMFLOAT3 ambient;
+};
+
+struct AdditionalMaterial
+{
+	std::string texPath;
+	int toonIdx;
+	bool edgeFlg;
+};
+
+struct Material
+{
+	unsigned int indicesNum;
+	BasicMatrial material;
+	AdditionalMaterial additional;
+};
 
 class PMDMesh
 {
@@ -68,6 +92,11 @@ public:
 		return m_indexBufferView;
 	}
 
+	ID3D12DescriptorHeap* GetMaterialDescriptorHeap()
+	{
+		return m_pMaterialDescHeap;
+	}
+
 private:
 	// シグネチャー情報
 	char m_signature[3];
@@ -92,6 +121,15 @@ private:
 
 	// インデックスバッファービュー
 	D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
+
+	// マテリアルの数
+	unsigned int m_numberOfMaterial;
+
+	// マテリアルバッファー
+	ID3D12Resource* m_pMaterialBuffer;
+
+	// マテリアルディスクリプターヒープ
+	ID3D12DescriptorHeap* m_pMaterialDescHeap;
 
 private:
 	void ClearResources();
