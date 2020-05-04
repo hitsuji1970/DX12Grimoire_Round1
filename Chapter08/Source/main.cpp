@@ -152,61 +152,8 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 
 	ShowWindow(hWnd, SW_SHOW);
 
-	// 頂点バッファー
-	constexpr size_t pmdvertex_size = 38;
-	FILE* fp;
-	_tfopen_s(&fp, TEXT("model/初音ミク.pmd"), TEXT("rb"));
-
-	char signature[3] = {};
-	PMDHeader pmdHeader;
-	fread(signature, sizeof(signature), 1, fp);
-	fread(&pmdHeader, sizeof(pmdHeader), 1, fp);
-
-	unsigned int vertNum;
-	fread(&vertNum, sizeof(vertNum), 1, fp);
-	std::vector<unsigned char> vertices(vertNum * pmdvertex_size);
-	fread(vertices.data(), vertices.size(), 1, fp);
-
-	ID3D12Resource* vertBuff = nullptr;
-	result = _dev->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(vertices.size()), D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr, IID_PPV_ARGS(&vertBuff));
-
-	unsigned char* vertMap = nullptr;
-	result = vertBuff->Map(0, nullptr, (void**)&vertMap);
-	std::copy(std::begin(vertices), std::end(vertices), vertMap);
-	vertBuff->Unmap(0, nullptr);
-
-	D3D12_VERTEX_BUFFER_VIEW vbView = {};
-	vbView.BufferLocation = vertBuff->GetGPUVirtualAddress();
-	vbView.SizeInBytes = vertices.size();
-	vbView.StrideInBytes = pmdvertex_size;
-
-	// インデックスバッファー
-	std::vector<unsigned short> indices;
-	unsigned int indicesNum;
-	fread(&indicesNum, sizeof(indicesNum), 1, fp);
-	indices.resize(indicesNum);
-	fread(indices.data(), indices.size() * sizeof(indices[0]), 1, fp);
-
-	fclose(fp);
-
-	ID3D12Resource* idxBuff = nullptr;
-	result = _dev->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(indices.size() * sizeof(indices[0])), D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr, IID_PPV_ARGS(&idxBuff));
-
-	unsigned short* mappedIndex = nullptr;
-	idxBuff->Map(0, nullptr, (void**)&mappedIndex);
-	std::copy(std::begin(indices), std::end(indices), mappedIndex);
-	idxBuff->Unmap(0, nullptr);
-
-	D3D12_INDEX_BUFFER_VIEW ibView = {};
-	ibView.BufferLocation = idxBuff->GetGPUVirtualAddress();
-	ibView.Format = DXGI_FORMAT_R16_UINT;
-	ibView.SizeInBytes = indices.size() * sizeof(indices[0]);
+	PMDMesh mesh;
+	result = mesh.LoadFromFile(_dev, TEXT("model/初音ミク.pmd"));
 
 	// 深度バッファー
 	D3D12_RESOURCE_DESC depthResDesc = {};
@@ -367,7 +314,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	// シェーダーリソースビュー（定数バッファー）
 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
 	cbvDesc.BufferLocation = constBuff->GetGPUVirtualAddress();
-	cbvDesc.SizeInBytes = constBuff->GetDesc().Width;
+	cbvDesc.SizeInBytes = static_cast<UINT>(constBuff->GetDesc().Width);
 	_dev->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
 
 	// シェーダー
@@ -583,7 +530,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 
 		auto rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
 		auto dsvH = dsvHeap->GetCPUDescriptorHandleForHeapStart();
-		rtvH.ptr += static_cast<size_t>(bbIdx * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV));
+		rtvH.ptr += static_cast<size_t>(bbIdx) * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 		_cmdList->OMSetRenderTargets(1, &rtvH, true, &dsvH);
 
 		float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -595,15 +542,15 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		_cmdList->SetGraphicsRootSignature(rootSignature);
 
 		_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		_cmdList->IASetVertexBuffers(0, 1, &vbView);
-		_cmdList->IASetIndexBuffer(&ibView);
+		_cmdList->IASetVertexBuffers(0, 1, &mesh.GetVertexBufferView());
+		_cmdList->IASetIndexBuffer(&mesh.GetIndexBufferView());
 
 		_cmdList->SetGraphicsRootSignature(rootSignature);
 		_cmdList->SetDescriptorHeaps(1, &basicDescHeap);
 		_cmdList->SetGraphicsRootDescriptorTable(0, basicDescHeap->GetGPUDescriptorHandleForHeapStart());
-		_cmdList->DrawIndexedInstanced(indicesNum, 1, 0, 0, 0);
+		_cmdList->DrawIndexedInstanced(mesh.GetNumberOfIndex(), 1, 0, 0, 0);
 
-		angle = DirectX::XM_PI;
+		angle += 0.01f;
 		worldMatrix = DirectX::XMMatrixRotationY(angle);
 		mapMatrix->world = worldMatrix;
 		mapMatrix->viewproj = viewMatrix * projectionMatrix;

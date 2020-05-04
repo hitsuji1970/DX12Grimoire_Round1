@@ -1,14 +1,15 @@
+#include <d3d12.h>
 #include <DirectXMath.h>
-#include <vector>
+#include <Windows.h>
 
-// PMD�w�b�_�[�\����
+// PMDヘッダー構造体
 struct PMDHeader {
-	float version;			// �� : 00 00 80 3F == 1.00
-	char model_name[20];	// ���f����
-	char comment[256];		// ���f���R�����g
+	float version;			// 例 : 00 00 80 3F == 1.00
+	char model_name[20];	// モデル名
+	char comment[256];		// モデルコメント
 };
 
-// PMD���_�\����
+// PMD頂点構造体
 struct PMDVertex
 {
 	DirectX::XMFLOAT3 pos;
@@ -19,28 +20,79 @@ struct PMDVertex
 	unsigned char endflg;
 };
 
+// PMDマテリアル構造体
+#pragma pack(1)
+struct PMDMaterial
+{
+	DirectX::XMFLOAT3 diffuse;
+	float alpha;
+	float specurarity;
+	DirectX::XMFLOAT3 specular;
+	DirectX::XMFLOAT3 ambient;
+	unsigned char toonIdx;
+	unsigned char edgeFlg;
+	// パディング2bytesが入る
+	unsigned int indicesNum;
+	char texFilePath[20];
+};
+#pragma pack()
+
 class PMDMesh
 {
 public:
-	// ���_�f�[�^�̃T�C�Y
+	// 頂点データのサイズ
 	static const size_t VERTEX_SIZE = 38;
 
-private:
-	char signature[3];
-	PMDHeader header;
-	unsigned int vertNum;
-	std::vector<unsigned char> rawVertices;
+	PMDMesh();
+	virtual ~PMDMesh();
 
-public:
-	bool LoadFromFile(LPCTSTR filename);
-
-	const std::vector<unsigned char>& GetRawVertices() const
-	{
-		return rawVertices;
-	}
+	HRESULT LoadFromFile(ID3D12Device* const pD3D12Device, LPCTSTR filename);
 
 	unsigned int GetNumberOfVertex()
 	{
-		return vertNum;
+		return m_numberOfVertex;
 	}
+
+	unsigned int GetNumberOfIndex()
+	{
+		return m_numberOfIndex;
+	}
+
+	const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const
+	{
+		return m_vertexBufferView;
+	}
+
+	const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferView() const
+	{
+		return m_indexBufferView;
+	}
+
+private:
+	// シグネチャー情報
+	char m_signature[3];
+
+	// ヘッダー情報
+	PMDHeader m_header;
+
+	// 頂点数
+	unsigned int m_numberOfVertex;
+
+	// 頂点バッファー
+	ID3D12Resource* m_pVertexBuffer;
+
+	// 頂点バッファービュー
+	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
+
+	// インデックスの数
+	unsigned int m_numberOfIndex;
+
+	// インデックスバッファー
+	ID3D12Resource* m_pIndexBuffer;
+
+	// インデックスバッファービュー
+	D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
+
+private:
+	void ClearResources();
 };
