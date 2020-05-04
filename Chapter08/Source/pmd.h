@@ -152,6 +152,7 @@ namespace pmd
 		void ClearResources();
 
 		ID3D12Resource* LoadTextureFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename);
+		ID3D12Resource* CreateWhiteTexture(ID3D12Device* const pD3D12Device);
 	};
 
 } // namespace pmd

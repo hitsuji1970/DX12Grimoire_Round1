@@ -212,6 +212,7 @@ namespace pmd
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MipLevels = 1;
 
+		auto whiteTex = CreateWhiteTexture(pD3D12Device);
 		auto matDescHeapH = m_pMaterialDescHeap->GetCPUDescriptorHandleForHeapStart();
 		auto inc = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		for (auto i = 0u; i < m_numberOfMaterial; i++) {
@@ -222,8 +223,13 @@ namespace pmd
 			if (m_materials[i].pTextureResource)
 			{
 				srvDesc.Format = m_materials[i].pTextureResource->GetDesc().Format;
+				pD3D12Device->CreateShaderResourceView(m_materials[i].pTextureResource, &srvDesc, matDescHeapH);
 			}
-			pD3D12Device->CreateShaderResourceView(m_materials[i].pTextureResource, &srvDesc, matDescHeapH);
+			else
+			{
+				srvDesc.Format = whiteTex->GetDesc().Format;
+				pD3D12Device->CreateShaderResourceView(whiteTex, &srvDesc, matDescHeapH);
+			}
 			matDescHeapH.ptr += inc;
 		}
 
@@ -298,5 +304,46 @@ namespace pmd
 		}
 
 		return texBuff;
+	}
+
+	ID3D12Resource* PMDMesh::CreateWhiteTexture(ID3D12Device* const pD3D12Device)
+	{
+		D3D12_HEAP_PROPERTIES texHeapProp = {};
+
+		texHeapProp.Type = D3D12_HEAP_TYPE_CUSTOM;
+		texHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
+		texHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
+		texHeapProp.CreationNodeMask = 0;
+		texHeapProp.VisibleNodeMask = 0;
+
+		D3D12_RESOURCE_DESC resDesc = {};
+		resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		resDesc.Width = 4;
+		resDesc.Height = 4;
+		resDesc.DepthOrArraySize = 1;
+		resDesc.SampleDesc.Count = 1;
+		resDesc.SampleDesc.Quality = 0;
+		resDesc.MipLevels = 1;
+		resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+		resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+		ID3D12Resource* whiteBuff = nullptr;
+		auto result = pD3D12Device->CreateCommittedResource(
+			&texHeapProp, D3D12_HEAP_FLAG_NONE,
+			&resDesc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+			nullptr, IID_PPV_ARGS(&whiteBuff)
+		);
+
+		if (FAILED(result))
+		{
+			return nullptr;
+		}
+
+		std::vector<unsigned char> data(4 * 4 * 4);
+		std::fill(data.begin(), data.end(), 0xff);
+		result = whiteBuff->WriteToSubresource(0, nullptr, data.data(), 4 * 4, data.size());
+
+		return whiteBuff;
 	}
 } // namespace pmd
