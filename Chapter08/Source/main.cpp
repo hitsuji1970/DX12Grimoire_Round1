@@ -76,10 +76,25 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		return -1;
 	}
 #endif // _DEBUG
+	std::vector<IDXGIAdapter*> adapters;
+	IDXGIAdapter* tmpAdapter = nullptr;
+	IDXGIAdapter* adapter = nullptr;
+	for (int i = 0; _dxgiFactory->EnumAdapters(i, &tmpAdapter) != DXGI_ERROR_NOT_FOUND; i++) {
+		adapters.push_back(tmpAdapter);
+	}
+	for (auto adpt : adapters) {
+		DXGI_ADAPTER_DESC adesc = {};
+		adpt->GetDesc(&adesc);
+		std::wstring strDesc = adesc.Description;
+		if (strDesc.find(L"NVIDIA") != std::string::npos) {
+			adapter = adpt;
+			break;
+		}
+	}
 
 	D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_1_0_CORE;
 	for (auto lv : levels) {
-		if (D3D12CreateDevice(nullptr, lv, IID_PPV_ARGS(&_dev)) == S_OK) {
+		if (D3D12CreateDevice(adapter, lv, IID_PPV_ARGS(&_dev)) == S_OK) {
 			featureLevel = lv;
 			break;
 		}
