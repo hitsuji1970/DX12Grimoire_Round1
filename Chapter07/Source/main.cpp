@@ -191,7 +191,6 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 
 	fclose(fp);
 
-	// インデックスバッファー
 	ID3D12Resource* idxBuff = nullptr;
 	result = _dev->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
@@ -207,6 +206,46 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	ibView.BufferLocation = idxBuff->GetGPUVirtualAddress();
 	ibView.Format = DXGI_FORMAT_R16_UINT;
 	ibView.SizeInBytes = indices.size() * sizeof(indices[0]);
+
+	// 深度バッファー
+	D3D12_RESOURCE_DESC depthResDesc = {};
+	depthResDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	depthResDesc.Width = window_width;
+	depthResDesc.Height = window_height;
+	depthResDesc.DepthOrArraySize = 1;
+	depthResDesc.Format = DXGI_FORMAT_D32_FLOAT;
+	depthResDesc.SampleDesc.Count = 1;
+	depthResDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+	// 深度値ヒーププロパティ
+	D3D12_HEAP_PROPERTIES depthHeapProp = {};
+	depthHeapProp.Type = D3D12_HEAP_TYPE_DEFAULT;
+	depthHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+	depthHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+
+	D3D12_CLEAR_VALUE depthClearValue = {};
+	depthClearValue.DepthStencil.Depth = 1.0f;
+	depthClearValue.Format = DXGI_FORMAT_D32_FLOAT;
+
+	ID3D12Resource* depthBuffer = nullptr;
+	result = _dev->CreateCommittedResource(
+		&depthHeapProp, D3D12_HEAP_FLAG_NONE,
+		&depthResDesc, D3D12_RESOURCE_STATE_DEPTH_WRITE,
+		&depthClearValue, IID_PPV_ARGS(&depthBuffer));
+
+	// 深度バッファー用のディスクリプターヒープ
+	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
+	dsvHeapDesc.NumDescriptors = 1;
+	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+	ID3D12DescriptorHeap* dsvHeap = nullptr;
+	result = _dev->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsvHeap));
+	
+	// 深度ビュー
+	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+	dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
+	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+	dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
+	_dev->CreateDepthStencilView(depthBuffer, &dsvDesc, dsvHeap->GetCPUDescriptorHandleForHeapStart());
 
 	// テクスチャーリソース
 	const wchar_t* textureFileName = L"img/textest200x200.png";
@@ -469,37 +508,42 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	rootSigBlob->Release();
 
 	// パイプラインステート
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC piplineStateDesc = {};
-	piplineStateDesc.pRootSignature = rootSignature;
-	piplineStateDesc.VS.pShaderBytecode = _vsBlob->GetBufferPointer();
-	piplineStateDesc.VS.BytecodeLength = _vsBlob->GetBufferSize();
-	piplineStateDesc.PS.pShaderBytecode = _psBlob->GetBufferPointer();
-	piplineStateDesc.PS.BytecodeLength = _psBlob->GetBufferSize();
-	piplineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
-	piplineStateDesc.RasterizerState.MultisampleEnable = false;
-	piplineStateDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-	piplineStateDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
-	piplineStateDesc.RasterizerState.DepthClipEnable = true;
-	piplineStateDesc.BlendState.AlphaToCoverageEnable = false;
-	piplineStateDesc.BlendState.IndependentBlendEnable = false;
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
+	pipelineStateDesc.pRootSignature = rootSignature;
+	pipelineStateDesc.VS.pShaderBytecode = _vsBlob->GetBufferPointer();
+	pipelineStateDesc.VS.BytecodeLength = _vsBlob->GetBufferSize();
+	pipelineStateDesc.PS.pShaderBytecode = _psBlob->GetBufferPointer();
+	pipelineStateDesc.PS.BytecodeLength = _psBlob->GetBufferSize();
+	pipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
+	pipelineStateDesc.DepthStencilState.DepthEnable = true;
+	pipelineStateDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	pipelineStateDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+	pipelineStateDesc.DepthStencilState.StencilEnable = false;
+	pipelineStateDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+	pipelineStateDesc.RasterizerState.MultisampleEnable = false;
+	pipelineStateDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	pipelineStateDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+	pipelineStateDesc.RasterizerState.DepthClipEnable = true;
+	pipelineStateDesc.BlendState.AlphaToCoverageEnable = false;
+	pipelineStateDesc.BlendState.IndependentBlendEnable = false;
 
 	D3D12_RENDER_TARGET_BLEND_DESC renderTargetBlendDesc = {};
 	renderTargetBlendDesc.BlendEnable = false;
 	renderTargetBlendDesc.LogicOpEnable = false;
 	renderTargetBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-	piplineStateDesc.BlendState.RenderTarget[0] = renderTargetBlendDesc;
+	pipelineStateDesc.BlendState.RenderTarget[0] = renderTargetBlendDesc;
 
-	piplineStateDesc.InputLayout.pInputElementDescs = inputLayout;
-	piplineStateDesc.InputLayout.NumElements = _countof(inputLayout);
-	piplineStateDesc.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
-	piplineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	piplineStateDesc.NumRenderTargets = 1;
-	piplineStateDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-	piplineStateDesc.SampleDesc.Count = 1;
-	piplineStateDesc.SampleDesc.Quality = 0;
+	pipelineStateDesc.InputLayout.pInputElementDescs = inputLayout;
+	pipelineStateDesc.InputLayout.NumElements = _countof(inputLayout);
+	pipelineStateDesc.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
+	pipelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	pipelineStateDesc.NumRenderTargets = 1;
+	pipelineStateDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	pipelineStateDesc.SampleDesc.Count = 1;
+	pipelineStateDesc.SampleDesc.Quality = 0;
 
 	ID3D12PipelineState* _pipelineState = nullptr;
-	result = _dev->CreateGraphicsPipelineState(&piplineStateDesc, IID_PPV_ARGS(&_pipelineState));
+	result = _dev->CreateGraphicsPipelineState(&pipelineStateDesc, IID_PPV_ARGS(&_pipelineState));
 
 	D3D12_VIEWPORT viewport = {};
 	viewport.Width = window_width;
@@ -530,27 +574,19 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 
 		auto bbIdx = _swapchain->GetCurrentBackBufferIndex();
 
-#if 0
-		D3D12_RESOURCE_BARRIER BarrierDesc = {};
-		BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-		BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-		BarrierDesc.Transition.pResource = _backBuffers[bbIdx];
-		BarrierDesc.Transition.Subresource = 0;
-		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
-		BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-		_cmdList->ResourceBarrier(1, &BarrierDesc);
-#endif
 		_cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
 			_backBuffers[bbIdx], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 		_cmdList->SetPipelineState(_pipelineState);
 
 		auto rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
-		rtvH.ptr += bbIdx * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		_cmdList->OMSetRenderTargets(1, &rtvH, true, nullptr);
+		auto dsvH = dsvHeap->GetCPUDescriptorHandleForHeapStart();
+		rtvH.ptr += static_cast<size_t>(bbIdx * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV));
+		_cmdList->OMSetRenderTargets(1, &rtvH, true, &dsvH);
 
 		float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 		_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
+		_cmdList->ClearDepthStencilView(dsvH, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 		_cmdList->RSSetViewports(1, &viewport);
 		_cmdList->RSSetScissorRects(1, &scissorRect);
@@ -608,7 +644,7 @@ HWND InitWindow(WNDCLASSEX* const pWndClass)
 	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);
 
 	HWND hWnd = CreateWindow(pWndClass->lpszClassName,
-		TEXT("DX12テスト"),
+		TEXT("DX12テスト PMDモデル表示"),
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
