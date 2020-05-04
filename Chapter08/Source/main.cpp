@@ -22,8 +22,6 @@
 // 関数プロトタイプ
 HWND InitWindow(WNDCLASSEX* const pWndClass);
 LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
-HRESULT CreateTextureResource(const DirectX::Image* const pImg, const DirectX::TexMetadata& texMetaData, ID3D12Resource** ppUploadBuffer, ID3D12Resource** ppTextureBuffer);
-size_t AlignmentedSize(size_t size, size_t alignment);
 void DebugOutputFromString(const char* format, ...);
 void EnableDebugLayer();
 
@@ -44,12 +42,6 @@ struct MatricesData
 {
 	DirectX::XMMATRIX world;
 	DirectX::XMMATRIX viewproj;
-};
-
-// テクスチャーテスト構造体
-struct TexRGBA
-{
-	unsigned char R, G, B, A;
 };
 
 #ifdef _DEBUG
@@ -85,7 +77,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	}
 #endif // _DEBUG
 
-	D3D_FEATURE_LEVEL featureLevel;
+	D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_1_0_CORE;
 	for (auto lv : levels) {
 		if (D3D12CreateDevice(nullptr, lv, IID_PPV_ARGS(&_dev)) == S_OK) {
 			featureLevel = lv;
@@ -195,78 +187,6 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
 	_dev->CreateDepthStencilView(depthBuffer, &dsvDesc, dsvHeap->GetCPUDescriptorHandleForHeapStart());
 
-	// テクスチャーリソース
-	const wchar_t* textureFileName = L"img/textest200x200.png";
-	DirectX::TexMetadata texMetaData = {};
-	DirectX::ScratchImage scratchImg = {};
-	result = DirectX::LoadFromWICFile(
-		textureFileName, DirectX::WIC_FLAGS_NONE,
-		&texMetaData, scratchImg);
-
-	auto img = scratchImg.GetImage(0, 0, 0);
-
-	// テクスチャーバッファー
-	ID3D12Resource* uploadBuff = nullptr;
-	ID3D12Resource* texBuff = nullptr;
-	result = CreateTextureResource(img, texMetaData, &uploadBuff, &texBuff);
-
-	uint8_t* mapforImg = nullptr;
-	result = uploadBuff->Map(0, nullptr, (void**)&mapforImg);
-	auto srcAddress = img->pixels;
-	auto rowPitch = AlignmentedSize(img->rowPitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
-	for (int y = 0; y < img->height; y++) {
-		std::copy_n(srcAddress, rowPitch, mapforImg);
-		srcAddress += img->rowPitch;
-		mapforImg += rowPitch;
-	}
-	//std::copy_n(img->pixels, img->slicePitch, mapforImg);
-	uploadBuff->Unmap(0, nullptr);
-
-	{
-		// コピー元
-		D3D12_TEXTURE_COPY_LOCATION src = {};
-		src.pResource = uploadBuff;
-		src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-		src.PlacedFootprint.Offset = 0;
-		src.PlacedFootprint.Footprint.Width = (UINT)texMetaData.width;
-		src.PlacedFootprint.Footprint.Height = (UINT)texMetaData.height;
-		src.PlacedFootprint.Footprint.Depth = (UINT)texMetaData.depth;
-		src.PlacedFootprint.Footprint.RowPitch = (UINT)AlignmentedSize(img->rowPitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
-		src.PlacedFootprint.Footprint.Format = img->format;
-
-		// コピー先
-		D3D12_TEXTURE_COPY_LOCATION dst = {};
-		dst.pResource = texBuff;
-		dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-		dst.SubresourceIndex = 0;
-
-		// コピーコマンド
-		_cmdList->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-		//result = texBuff->WriteToSubresource(0, nullptr, img->pixels, img->rowPitch, img->slicePitch);
-
-		D3D12_RESOURCE_BARRIER BarrierDesc;
-		BarrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-		BarrierDesc.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-		BarrierDesc.Transition.pResource = texBuff;
-		BarrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-		BarrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-		BarrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-		_cmdList->ResourceBarrier(1, &BarrierDesc);
-		_cmdList->Close();
-
-		ID3D12CommandList* cmdLists[] = { _cmdList };
-		_cmdQueue->ExecuteCommandLists(1, cmdLists);
-		_cmdQueue->Signal(_fence, ++_fenceVal);
-		if (_fence->GetCompletedValue() != _fenceVal) {
-			auto event = CreateEvent(nullptr, false, false, nullptr);
-			_fence->SetEventOnCompletion(_fenceVal, event);
-			WaitForSingleObject(event, INFINITE);
-			CloseHandle(event);
-		}
-		_cmdAllocator->Reset();
-		_cmdList->Reset(_cmdAllocator, nullptr);
-	}
-
 	// 定数バッファーに行列を設定
 	auto worldMatrix = DirectX::XMMatrixRotationY(DirectX::XM_PIDIV4);
 	DirectX::XMFLOAT3 eye(0, 10, -15);
@@ -296,20 +216,11 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	descHeapDesc.NodeMask = 0;
 
-	// SRV1つとCBV1つ
-	descHeapDesc.NumDescriptors = 2;
+	// CBV1つ
+	descHeapDesc.NumDescriptors = 1;
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	result = _dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&basicDescHeap));
 	auto basicHeapHandle = basicDescHeap->GetCPUDescriptorHandleForHeapStart();
-
-	// シェーダーリソースビュー（テクスチャー）
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Format = texMetaData.format;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-	srvDesc.Texture2D.MipLevels = 1;
-	_dev->CreateShaderResourceView(texBuff, &srvDesc, basicHeapHandle);
-	basicHeapHandle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	// シェーダーリソースビュー（定数バッファー）
 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
@@ -404,23 +315,16 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 
 	D3D12_DESCRIPTOR_RANGE descTblRange[2] = {};
 
-	// テクスチャー用レジスター0番
+	// 変換行列用レジスター0番
 	descTblRange[0].NumDescriptors = 1;
-	descTblRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descTblRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
 	descTblRange[0].BaseShaderRegister = 0;
 	descTblRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-	// 定数用レジスタ－1番
-	descTblRange[1].NumDescriptors = 1;
-	descTblRange[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descTblRange[1].BaseShaderRegister = 0;
-	descTblRange[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
 
 	D3D12_ROOT_PARAMETER rootParam = {};
 	rootParam.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParam.DescriptorTable.pDescriptorRanges = descTblRange;
-	rootParam.DescriptorTable.NumDescriptorRanges = 2;
+	rootParam.DescriptorTable.NumDescriptorRanges = 1;
 	rootParam.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 	// サンプラー設定
@@ -617,72 +521,6 @@ LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	}
 
 	return DefWindowProc(hwnd, msg, wparam, lparam);
-}
-
-HRESULT CreateTextureResource(
-	const DirectX::Image* const pImg,
-	const DirectX::TexMetadata& texMetaData,
-	ID3D12Resource** ppUploadbuffer,
-	ID3D12Resource** ppTextureBuffer)
-{
-	D3D12_HEAP_PROPERTIES uploadHepProp = {};
-	uploadHepProp.Type = D3D12_HEAP_TYPE_UPLOAD;
-	uploadHepProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	uploadHepProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-	uploadHepProp.CreationNodeMask = 0;
-	uploadHepProp.VisibleNodeMask = 0;
-
-	D3D12_RESOURCE_DESC resDesc = {};
-	resDesc.Format = DXGI_FORMAT_UNKNOWN;
-	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resDesc.Width = AlignmentedSize(pImg->rowPitch, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT) * pImg->height;
-	resDesc.Height = 1;
-	resDesc.DepthOrArraySize = 1;
-	resDesc.MipLevels = 1;
-	resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-	resDesc.SampleDesc.Count = 1;
-	resDesc.SampleDesc.Quality = 0;
-
-	auto result = _dev->CreateCommittedResource(
-		&uploadHepProp,
-		D3D12_HEAP_FLAG_NONE,
-		&resDesc,
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(ppUploadbuffer));
-
-	if (result != S_OK) {
-		return result;
-	}
-
-	D3D12_HEAP_PROPERTIES texHeapProp = {};
-	texHeapProp.Type = D3D12_HEAP_TYPE_DEFAULT;
-	texHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	texHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-	texHeapProp.CreationNodeMask = 0;
-	texHeapProp.VisibleNodeMask = 0;
-
-	resDesc.Format = texMetaData.format;
-	resDesc.Width = (UINT)texMetaData.width;
-	resDesc.Height = (UINT)texMetaData.height;
-	resDesc.DepthOrArraySize = (UINT)texMetaData.arraySize;
-	resDesc.MipLevels = (UINT)texMetaData.mipLevels;
-	resDesc.Dimension = static_cast<D3D12_RESOURCE_DIMENSION>(texMetaData.dimension);
-	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-
-	return _dev->CreateCommittedResource(
-		&texHeapProp,
-		D3D12_HEAP_FLAG_NONE,
-		&resDesc,
-		D3D12_RESOURCE_STATE_COPY_DEST,
-		nullptr,
-		IID_PPV_ARGS(ppTextureBuffer));
-}
-
-size_t AlignmentedSize(size_t size, size_t alignment)
-{
-	return size + alignment - size % alignment;
 }
 
 void EnableDebugLayer()
