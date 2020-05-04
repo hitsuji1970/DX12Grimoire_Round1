@@ -465,9 +465,15 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 
 		ID3D12DescriptorHeap* materialDescHeap[] = { mesh.GetMaterialDescriptorHeap() };
 		_cmdList->SetDescriptorHeaps(1, materialDescHeap);
-		_cmdList->SetGraphicsRootDescriptorTable(1, materialDescHeap[0]->GetGPUDescriptorHandleForHeapStart());
 
-		_cmdList->DrawIndexedInstanced(mesh.GetNumberOfIndex(), 1, 0, 0, 0);
+		auto materialH = materialDescHeap[0]->GetGPUDescriptorHandleForHeapStart();
+		unsigned int idxOffset = 0;
+		for (auto& m : mesh.GetMaterials()) {
+			_cmdList->SetGraphicsRootDescriptorTable(1, materialH);
+			_cmdList->DrawIndexedInstanced(m.indicesNum, 1, idxOffset, 0, 0);
+			materialH.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			idxOffset += m.indicesNum;
+		}
 
 		angle += 0.01f;
 		worldMatrix = DirectX::XMMatrixRotationY(angle);

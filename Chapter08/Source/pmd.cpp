@@ -97,14 +97,14 @@ HRESULT PMDMesh::LoadFromFile(ID3D12Device* const pD3D12Device, LPCTSTR cpFileNa
 	std::vector<SerializedPMDMaterial> serializedMaterials(m_numberOfMaterial);
 	fread(serializedMaterials.data(), serializedMaterials.size() * sizeof(SerializedPMDMaterial), 1, fp);
 
-	std::vector<Material> materials(m_numberOfMaterial);
+	m_materials.resize(m_numberOfMaterial);
 	for (int i = 0; i < serializedMaterials.size(); i++) {
-		materials[i].indicesNum = serializedMaterials[i].indicesNum;
-		materials[i].material.diffuse = serializedMaterials[i].diffuse;
-		materials[i].material.alpha = serializedMaterials[i].alpha;
-		materials[i].material.specular = serializedMaterials[i].specular;
-		materials[i].material.specularity = serializedMaterials[i].specularity;
-		materials[i].material.ambient = serializedMaterials[i].ambient;
+		m_materials[i].indicesNum = serializedMaterials[i].indicesNum;
+		m_materials[i].material.diffuse = serializedMaterials[i].diffuse;
+		m_materials[i].material.alpha = serializedMaterials[i].alpha;
+		m_materials[i].material.specular = serializedMaterials[i].specular;
+		m_materials[i].material.specularity = serializedMaterials[i].specularity;
+		m_materials[i].material.ambient = serializedMaterials[i].ambient;
 	}
 
 	auto materialBufferSize = sizeof(BasicMatrial);
@@ -124,7 +124,7 @@ HRESULT PMDMesh::LoadFromFile(ID3D12Device* const pD3D12Device, LPCTSTR cpFileNa
 
 	unsigned char* mappedMaterial = nullptr;
 	result = m_pMaterialBuffer->Map(0, nullptr, (void**)&mappedMaterial);
-	for (auto& m : materials) {
+	for (auto& m : m_materials) {
 		*reinterpret_cast<BasicMatrial*>(mappedMaterial) = m.material;
 		mappedMaterial += materialBufferSize;
 	}

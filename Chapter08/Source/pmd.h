@@ -97,6 +97,11 @@ public:
 		return m_pMaterialDescHeap;
 	}
 
+	const std::vector<Material>& GetMaterials() const
+	{
+		return m_materials;
+	}
+
 private:
 	// シグネチャー情報
 	char m_signature[3];
@@ -130,6 +135,9 @@ private:
 
 	// マテリアルディスクリプターヒープ
 	ID3D12DescriptorHeap* m_pMaterialDescHeap;
+
+	// マテリアル実体
+	std::vector<Material> m_materials;
 
 private:
 	void ClearResources();
