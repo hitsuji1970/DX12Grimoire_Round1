@@ -157,14 +157,28 @@ namespace pmd
 			auto len = std::strlen(serializedMaterials[i].texFilePath);
 			if (len > 0) {
 				std::wstring texPath = folderPath + L'/';
-				m_materials[i].additionalMaterial.texPath = folderPath + L'/';
 				for (size_t j = 0; j < len; j++) {
 					wchar_t w;
 					mbtowc(&w, serializedMaterials[i].texFilePath + j, 1);
 					texPath.push_back(w);
 				}
+				if (std::count(texPath.begin(), texPath.end(), L'*') > 0) {
+					auto namePair = SplitFileName(texPath);
+					auto extension = GetExtension(namePair.first);
+					if (extension == L"sph" || extension == L"spa")
+					{
+						texPath = namePair.second;
+					}
+					else
+					{
+						texPath = namePair.first;
+					}
+				}
 				m_materials[i].additionalMaterial.texPath = texPath;
 				m_materials[i].pTextureResource = LoadTextureFromFile(pD3D12Device, texPath);
+#ifdef _DEBUG
+				printf("material[%d]: texture=\"%s\"\n", i, serializedMaterials[i].texFilePath);
+#endif // _DEBUG
 			}
 		}
 
@@ -238,17 +252,23 @@ namespace pmd
 		return S_OK;
 	}
 
-	void PMDMesh::ClearResources()
+	std::wstring PMDMesh::GetExtension(const std::wstring& path)
 	{
-		if (m_pVertexBuffer) {
-			m_pVertexBuffer->Release();
-			m_pVertexBuffer = nullptr;
+		auto index = path.rfind(L'.');
+		if (index == path.npos) {
+			return std::wstring();
 		}
+		auto offset = index + 1;
+		return path.substr(offset, path.length() - offset);
+	}
 
-		if (m_pIndexBuffer) {
-			m_pIndexBuffer->Release();
-			m_pIndexBuffer = nullptr;
-		}
+	std::pair<std::wstring, std::wstring> PMDMesh::SplitFileName(const std::wstring& src, const wchar_t separator)
+	{
+		auto idx = src.find(separator);
+		std::pair<std::wstring, std::wstring> ret;
+		ret.first = src.substr(0, idx);
+		ret.second = src.substr(idx + 1, src.length() - (idx + 1));
+		return ret;
 	}
 
 	ID3D12Resource* PMDMesh::LoadTextureFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename)
@@ -276,11 +296,11 @@ namespace pmd
 		D3D12_RESOURCE_DESC resDesc = {};
 		resDesc.Format = metadata.format;
 		resDesc.Width = metadata.width;
-		resDesc.Height = metadata.height;
-		resDesc.DepthOrArraySize = metadata.arraySize;
+		resDesc.Height = static_cast<UINT>(metadata.height);
+		resDesc.DepthOrArraySize = static_cast<UINT16>(metadata.arraySize);
 		resDesc.SampleDesc.Count = 1;
 		resDesc.SampleDesc.Quality = 0;
-		resDesc.MipLevels = metadata.mipLevels;
+		resDesc.MipLevels = static_cast<UINT16>(metadata.mipLevels);
 		resDesc.Dimension = static_cast<D3D12_RESOURCE_DIMENSION>(metadata.dimension);
 		resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 		resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
@@ -297,7 +317,9 @@ namespace pmd
 			return nullptr;
 		}
 
-		result = texBuff->WriteToSubresource(0, nullptr, img->pixels, img->rowPitch, img->slicePitch);
+		auto rowPitch = static_cast<UINT>(img->rowPitch);
+		auto slicePitch = static_cast<UINT>(img->slicePitch);
+		result = texBuff->WriteToSubresource(0, nullptr, img->pixels, rowPitch, slicePitch);
 		if (FAILED(result))
 		{
 			return nullptr;
@@ -342,8 +364,21 @@ namespace pmd
 
 		std::vector<unsigned char> data(4 * 4 * 4);
 		std::fill(data.begin(), data.end(), 0xff);
-		result = whiteBuff->WriteToSubresource(0, nullptr, data.data(), 4 * 4, data.size());
+		result = whiteBuff->WriteToSubresource(0, nullptr, data.data(), 4 * 4, static_cast<UINT>(data.size()));
 
 		return whiteBuff;
+	}
+
+	void PMDMesh::ClearResources()
+	{
+		if (m_pVertexBuffer) {
+			m_pVertexBuffer->Release();
+			m_pVertexBuffer = nullptr;
+		}
+
+		if (m_pIndexBuffer) {
+			m_pIndexBuffer->Release();
+			m_pIndexBuffer = nullptr;
+		}
 	}
 } // namespace pmd

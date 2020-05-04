@@ -160,7 +160,8 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	ShowWindow(hWnd, SW_SHOW);
 
 	pmd::PMDMesh mesh;
-	result = mesh.LoadFromFile(_dev, L"model/初音ミク.pmd");
+	//result = mesh.LoadFromFile(_dev, L"model/初音ミク.pmd");
+	result = mesh.LoadFromFile(_dev, L"model/巡音ルカ.pmd");
 
 	// 深度バッファー
 	D3D12_RESOURCE_DESC depthResDesc = {};
@@ -383,7 +384,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	renderTargetBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 	pipelineStateDesc.BlendState.RenderTarget[0] = renderTargetBlendDesc;
 	pipelineStateDesc.InputLayout.pInputElementDescs = pmd::PMDMesh::INPUT_LAYOUT.data();
-	pipelineStateDesc.InputLayout.NumElements = pmd::PMDMesh::INPUT_LAYOUT.size();
+	pipelineStateDesc.InputLayout.NumElements = static_cast<UINT>(pmd::PMDMesh::INPUT_LAYOUT.size());
 	pipelineStateDesc.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
 	pipelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	pipelineStateDesc.NumRenderTargets = 1;

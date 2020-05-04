@@ -149,10 +149,11 @@ namespace pmd
 		std::vector<Material> m_materials;
 
 	private:
-		void ClearResources();
-
+		std::wstring GetExtension(const std::wstring& path);
+		std::pair<std::wstring, std::wstring> SplitFileName(const std::wstring& src, const wchar_t separator = L'*');
 		ID3D12Resource* LoadTextureFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename);
 		ID3D12Resource* CreateWhiteTexture(ID3D12Device* const pD3D12Device);
+		void ClearResources();
 	};
 
 } // namespace pmd
