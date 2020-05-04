@@ -8,8 +8,8 @@ VSOutput BasicVS(
 	min16uint weight : WEIGHT
 ) {
 	VSOutput output;
-	output.svpos = mul(mat, pos);
-	output.normal = normal;
+	output.svpos = mul(mul(viewproj, world), pos);
+	output.normal = mul(world, float4(normal.xyz, 0));
 	output.uv = uv;
 	return output;
 }

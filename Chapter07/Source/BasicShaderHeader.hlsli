@@ -4,7 +4,8 @@ SamplerState smp : register(s0);
 // 定数バッファー
 cbuffer cbuff0 : register(b0)
 {
-	matrix mat;
+	matrix world;
+	matrix viewproj;
 };
 
 struct VSOutput {

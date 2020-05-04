@@ -39,10 +39,11 @@ ID3D12CommandAllocator* _cmdAllocator = nullptr;
 ID3D12GraphicsCommandList* _cmdList = nullptr;
 ID3D12CommandQueue* _cmdQueue = nullptr;
 
-// 頂点データ構造体
-struct Vertex {
-	DirectX::XMFLOAT3 pos;
-	DirectX::XMFLOAT2 uv;
+// シェーダーに渡す行列
+struct MatricesData
+{
+	DirectX::XMMATRIX world;
+	DirectX::XMMATRIX viewproj;
 };
 
 // テクスチャーテスト構造体
@@ -328,17 +329,18 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	auto viewMatrix = DirectX::XMMatrixLookAtLH(DirectX::XMLoadFloat3(&eye), DirectX::XMLoadFloat3(&target), DirectX::XMLoadFloat3(&up));
 	auto projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV2, static_cast<float>(window_width) / static_cast<float>(window_height), 1.0f, 100.f);
 
+	// 定数バッファー
 	ID3D12Resource* constBuff = nullptr;
 	result = _dev->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(DirectX::XMMATRIX) + 0xff) & ~0xff),
+		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(MatricesData) + 0xff) & ~0xff),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&constBuff));
 
 	// 行列をコピー
-	DirectX::XMMATRIX* mapMatrix;
+	MatricesData* mapMatrix;
 	result = constBuff->Map(0, nullptr, (void**)&mapMatrix);
 
 	// シェーダーリソースビュー
@@ -601,8 +603,10 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		_cmdList->SetGraphicsRootDescriptorTable(0, basicDescHeap->GetGPUDescriptorHandleForHeapStart());
 		_cmdList->DrawIndexedInstanced(indicesNum, 1, 0, 0, 0);
 
+		angle = DirectX::XM_PI;
 		worldMatrix = DirectX::XMMatrixRotationY(angle);
-		*mapMatrix = worldMatrix * viewMatrix * projectionMatrix;
+		mapMatrix->world = worldMatrix;
+		mapMatrix->viewproj = viewMatrix * projectionMatrix;
 
 		_cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
 			_backBuffers[bbIdx], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
