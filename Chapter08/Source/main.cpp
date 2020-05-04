@@ -145,7 +145,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	ShowWindow(hWnd, SW_SHOW);
 
 	pmd::PMDMesh mesh;
-	result = mesh.LoadFromFile(_dev, TEXT("model/初音ミク.pmd"));
+	result = mesh.LoadFromFile(_dev, L"model/初音ミク.pmd");
 
 	// 深度バッファー
 	D3D12_RESOURCE_DESC depthResDesc = {};
@@ -279,7 +279,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		}
 	}
 
-	D3D12_DESCRIPTOR_RANGE descTblRanges[2] = {};
+	D3D12_DESCRIPTOR_RANGE descTblRanges[3] = {};
 
 	// 変換行列用レジスター0番
 	descTblRanges[0].NumDescriptors = 1;
@@ -293,6 +293,12 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	descTblRanges[1].BaseShaderRegister = 1;
 	descTblRanges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
+	// テクスチャー（マテリアルと1対1）
+	descTblRanges[2].NumDescriptors = 1;
+	descTblRanges[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	descTblRanges[2].BaseShaderRegister = 0;
+	descTblRanges[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
 	D3D12_ROOT_PARAMETER rootParams[2] = {};
 	rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParams[0].DescriptorTable.pDescriptorRanges = &descTblRanges[0];
@@ -300,8 +306,8 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParams[1].DescriptorTable.pDescriptorRanges = &descTblRanges[1];
-	rootParams[1].DescriptorTable.NumDescriptorRanges = 1;
-	rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	rootParams[1].DescriptorTable.NumDescriptorRanges = 2;
+	rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
 	// サンプラー設定
 	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
@@ -432,11 +438,12 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		_cmdList->SetDescriptorHeaps(1, materialDescHeap);
 
 		auto materialH = materialDescHeap[0]->GetGPUDescriptorHandleForHeapStart();
+		auto cbvsrvIncSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) * 2;
 		unsigned int idxOffset = 0;
 		for (auto& m : mesh.GetMaterials()) {
 			_cmdList->SetGraphicsRootDescriptorTable(1, materialH);
 			_cmdList->DrawIndexedInstanced(m.indicesNum, 1, idxOffset, 0, 0);
-			materialH.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			materialH.ptr += cbvsrvIncSize;
 			idxOffset += m.indicesNum;
 		}
 

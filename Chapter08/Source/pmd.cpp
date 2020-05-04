@@ -1,4 +1,6 @@
-﻿#include <d3dx12.h>
+﻿#include <algorithm>
+#include <d3dx12.h>
+#include <DirectXTex.h>
 #include <tchar.h>
 #include <iostream>
 #include <Windows.h>
@@ -55,15 +57,21 @@ namespace pmd
 		ClearResources();
 	}
 
-	HRESULT PMDMesh::LoadFromFile(ID3D12Device* const pD3D12Device, LPCTSTR cpFileName)
+	HRESULT PMDMesh::LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename)
 	{
 		HRESULT result;
 		FILE* fp = nullptr;
 
-		auto state = _tfopen_s(&fp, cpFileName, TEXT("rb"));
+		auto state = _wfopen_s(&fp, filename.c_str(), TEXT("rb"));
 		if (state != 0) {
 			return E_FAIL;
 		}
+
+		auto pathIndex = filename.rfind('/');
+		if (pathIndex == filename.npos) {
+			pathIndex = filename.rfind('\\');
+		}
+		auto folderPath = filename.substr(0, pathIndex);
 
 		// シグネチャーとヘッダー情報
 		std::fread(m_signature, sizeof(m_signature), 1, fp);
@@ -138,11 +146,26 @@ namespace pmd
 		m_materials.resize(m_numberOfMaterial);
 		for (int i = 0; i < serializedMaterials.size(); i++) {
 			m_materials[i].indicesNum = serializedMaterials[i].indicesNum;
-			m_materials[i].material.diffuse = serializedMaterials[i].diffuse;
-			m_materials[i].material.alpha = serializedMaterials[i].alpha;
-			m_materials[i].material.specular = serializedMaterials[i].specular;
-			m_materials[i].material.specularity = serializedMaterials[i].specularity;
-			m_materials[i].material.ambient = serializedMaterials[i].ambient;
+			m_materials[i].basicMaterial.diffuse = serializedMaterials[i].diffuse;
+			m_materials[i].basicMaterial.alpha = serializedMaterials[i].alpha;
+			m_materials[i].basicMaterial.specular = serializedMaterials[i].specular;
+			m_materials[i].basicMaterial.specularity = serializedMaterials[i].specularity;
+			m_materials[i].basicMaterial.ambient = serializedMaterials[i].ambient;
+
+			m_materials[i].additionalMaterial.toonIdx = serializedMaterials[i].toonIdx;
+			m_materials[i].additionalMaterial.edgeFlg = serializedMaterials[i].edgeFlg;
+			auto len = std::strlen(serializedMaterials[i].texFilePath);
+			if (len > 0) {
+				std::wstring texPath = folderPath + L'/';
+				m_materials[i].additionalMaterial.texPath = folderPath + L'/';
+				for (size_t j = 0; j < len; j++) {
+					wchar_t w;
+					mbtowc(&w, serializedMaterials[i].texFilePath + j, 1);
+					texPath.push_back(w);
+				}
+				m_materials[i].additionalMaterial.texPath = texPath;
+				m_materials[i].pTextureResource = LoadTextureFromFile(pD3D12Device, texPath);
+			}
 		}
 
 		auto materialBufferSize = sizeof(BasicMatrial);
@@ -163,14 +186,14 @@ namespace pmd
 		unsigned char* mappedMaterial = nullptr;
 		result = m_pMaterialBuffer->Map(0, nullptr, (void**)&mappedMaterial);
 		for (auto& m : m_materials) {
-			*reinterpret_cast<BasicMatrial*>(mappedMaterial) = m.material;
+			*reinterpret_cast<BasicMatrial*>(mappedMaterial) = m.basicMaterial;
 			mappedMaterial += materialBufferSize;
 		}
 
 		D3D12_DESCRIPTOR_HEAP_DESC matDescHeapDesc = {};
 		matDescHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		matDescHeapDesc.NodeMask = 0;
-		matDescHeapDesc.NumDescriptors = m_numberOfMaterial;
+		matDescHeapDesc.NumDescriptors = m_numberOfMaterial * 2;
 		matDescHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		result = pD3D12Device->CreateDescriptorHeap(&matDescHeapDesc, IID_PPV_ARGS(&m_pMaterialDescHeap));
 		if (FAILED(result)) {
@@ -182,14 +205,30 @@ namespace pmd
 		D3D12_CONSTANT_BUFFER_VIEW_DESC matCBVDesc = {};
 		matCBVDesc.BufferLocation = m_pMaterialBuffer->GetGPUVirtualAddress();
 		matCBVDesc.SizeInBytes = static_cast<UINT>(materialBufferSize);
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = 1;
+
 		auto matDescHeapH = m_pMaterialDescHeap->GetCPUDescriptorHandleForHeapStart();
+		auto inc = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		for (auto i = 0u; i < m_numberOfMaterial; i++) {
 			pD3D12Device->CreateConstantBufferView(&matCBVDesc, matDescHeapH);
-			matDescHeapH.ptr += pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+			matDescHeapH.ptr += inc;
+
 			matCBVDesc.BufferLocation += materialBufferSize;
+			if (m_materials[i].pTextureResource)
+			{
+				srvDesc.Format = m_materials[i].pTextureResource->GetDesc().Format;
+			}
+			pD3D12Device->CreateShaderResourceView(m_materials[i].pTextureResource, &srvDesc, matDescHeapH);
+			matDescHeapH.ptr += inc;
 		}
 
 		std::fclose(fp);
+		m_loadedModelPath = filename;
 		return S_OK;
 	}
 
@@ -204,5 +243,60 @@ namespace pmd
 			m_pIndexBuffer->Release();
 			m_pIndexBuffer = nullptr;
 		}
+	}
+
+	ID3D12Resource* PMDMesh::LoadTextureFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename)
+	{
+		DirectX::TexMetadata metadata = {};
+		DirectX::ScratchImage scratchImg = {};
+		HRESULT result;
+
+		result = DirectX::LoadFromWICFile(filename.c_str(), DirectX::WIC_FLAGS_NONE, &metadata, scratchImg);
+
+		if (FAILED(result))
+		{
+			return nullptr;
+		}
+
+		auto img = scratchImg.GetImage(0, 0, 0);
+
+		D3D12_HEAP_PROPERTIES texHeapProp = {};
+		texHeapProp.Type = D3D12_HEAP_TYPE_CUSTOM;
+		texHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
+		texHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
+		texHeapProp.CreationNodeMask = 0;
+		texHeapProp.VisibleNodeMask = 0;
+
+		D3D12_RESOURCE_DESC resDesc = {};
+		resDesc.Format = metadata.format;
+		resDesc.Width = metadata.width;
+		resDesc.Height = metadata.height;
+		resDesc.DepthOrArraySize = metadata.arraySize;
+		resDesc.SampleDesc.Count = 1;
+		resDesc.SampleDesc.Quality = 0;
+		resDesc.MipLevels = metadata.mipLevels;
+		resDesc.Dimension = static_cast<D3D12_RESOURCE_DIMENSION>(metadata.dimension);
+		resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+		resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+		ID3D12Resource* texBuff = nullptr;
+		result = pD3D12Device->CreateCommittedResource(
+			&texHeapProp, D3D12_HEAP_FLAG_NONE,
+			&resDesc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+			nullptr, IID_PPV_ARGS(&texBuff)
+		);
+
+		if (FAILED(result))
+		{
+			return nullptr;
+		}
+
+		result = texBuff->WriteToSubresource(0, nullptr, img->pixels, img->rowPitch, img->slicePitch);
+		if (FAILED(result))
+		{
+			return nullptr;
+		}
+
+		return texBuff;
 	}
 } // namespace pmd

@@ -51,7 +51,7 @@ namespace pmd
 
 	struct AdditionalMaterial
 	{
-		std::string texPath;
+		std::wstring texPath;
 		int toonIdx;
 		bool edgeFlg;
 	};
@@ -59,8 +59,9 @@ namespace pmd
 	struct Material
 	{
 		unsigned int indicesNum;
-		BasicMatrial material;
-		AdditionalMaterial additional;
+		BasicMatrial basicMaterial;
+		AdditionalMaterial additionalMaterial;
+		ID3D12Resource* pTextureResource;
 	};
 
 	class PMDMesh
@@ -75,7 +76,7 @@ namespace pmd
 		PMDMesh();
 		virtual ~PMDMesh();
 
-		HRESULT LoadFromFile(ID3D12Device* const pD3D12Device, LPCTSTR filename);
+		HRESULT LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename);
 
 		unsigned int GetNumberOfVertex()
 		{
@@ -108,6 +109,9 @@ namespace pmd
 		}
 
 	private:
+		// ロードしたファイル名
+		std::wstring m_loadedModelPath;
+
 		// シグネチャー情報
 		char m_signature[3];
 
@@ -146,6 +150,8 @@ namespace pmd
 
 	private:
 		void ClearResources();
+
+		ID3D12Resource* LoadTextureFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename);
 	};
 
 } // namespace pmd
