@@ -43,6 +43,9 @@ namespace pmd
 		},
 	};
 
+	/**
+	 * コンストラクター
+	 */
 	PMDMesh::PMDMesh() :
 		m_signature{}, m_header(),
 		m_numberOfVertex(0), m_pVertexBuffer(nullptr), m_vertexBufferView{},
@@ -52,11 +55,17 @@ namespace pmd
 	{
 	}
 
+	/**
+	 * デストラクター
+	 */
 	PMDMesh::~PMDMesh()
 	{
 		ClearResources();
 	}
 
+	/**
+	 * PMDファイルからの読み込み
+	 */
 	HRESULT PMDMesh::LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename)
 	{
 		HRESULT result;
@@ -252,6 +261,9 @@ namespace pmd
 		return S_OK;
 	}
 
+	/**
+	 * ファイル名から拡張子を取得
+	 */
 	std::wstring PMDMesh::GetExtension(const std::wstring& path)
 	{
 		auto index = path.rfind(L'.');
@@ -262,6 +274,9 @@ namespace pmd
 		return path.substr(offset, path.length() - offset);
 	}
 
+	/**
+	 * '*'で区切られたテクスチャーファイル名を分割
+	 */
 	std::pair<std::wstring, std::wstring> PMDMesh::SplitFileName(const std::wstring& src, const wchar_t separator)
 	{
 		auto idx = src.find(separator);
@@ -271,6 +286,9 @@ namespace pmd
 		return ret;
 	}
 
+	/**
+	 * テクスチャーをファイルからロード
+	 */
 	ID3D12Resource* PMDMesh::LoadTextureFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename)
 	{
 		DirectX::TexMetadata metadata = {};
@@ -328,6 +346,9 @@ namespace pmd
 		return texBuff;
 	}
 
+	/**
+	 * 白1色のテクスチャーを生成
+	 */
 	ID3D12Resource* PMDMesh::CreateWhiteTexture(ID3D12Device* const pD3D12Device)
 	{
 		D3D12_HEAP_PROPERTIES texHeapProp = {};
@@ -369,6 +390,9 @@ namespace pmd
 		return whiteBuff;
 	}
 
+	/**
+	 * リソースの破棄
+	 */
 	void PMDMesh::ClearResources()
 	{
 		if (m_pVertexBuffer) {
@@ -379,6 +403,16 @@ namespace pmd
 		if (m_pIndexBuffer) {
 			m_pIndexBuffer->Release();
 			m_pIndexBuffer = nullptr;
+		}
+
+		if (m_pMaterialBuffer) {
+			m_pMaterialBuffer->Release();
+			m_pMaterialBuffer = nullptr;
+		}
+
+		if (m_pMaterialDescHeap) {
+			m_pMaterialDescHeap->Release();
+			m_pMaterialDescHeap = nullptr;
 		}
 	}
 } // namespace pmd

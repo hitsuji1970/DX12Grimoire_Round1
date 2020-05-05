@@ -149,10 +149,19 @@ namespace pmd
 		std::vector<Material> m_materials;
 
 	private:
+		// ファイル名文字列から拡張子を取得
 		std::wstring GetExtension(const std::wstring& path);
+
+		// '*'で区切られたテクスチャーファイル名を分割
 		std::pair<std::wstring, std::wstring> SplitFileName(const std::wstring& src, const wchar_t separator = L'*');
+
+		// テクスチャーをファイルからロード
 		ID3D12Resource* LoadTextureFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename);
+
+		// 白1色のテクスチャーを生成
 		ID3D12Resource* CreateWhiteTexture(ID3D12Device* const pD3D12Device);
+
+		// リソースの破棄
 		void ClearResources();
 	};
 
