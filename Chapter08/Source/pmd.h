@@ -62,6 +62,16 @@ namespace pmd
 		BasicMatrial basicMaterial;
 		AdditionalMaterial additionalMaterial;
 		ID3D12Resource* pTextureResource;
+
+		Material() : indicesNum(0), basicMaterial(), additionalMaterial(), pTextureResource(nullptr){}
+		~Material()
+		{
+			if (pTextureResource)
+			{
+				pTextureResource->Release();
+				pTextureResource = nullptr;
+			}
+		}
 	};
 
 	class PMDMesh
@@ -142,7 +152,7 @@ namespace pmd
 		// マテリアルバッファー
 		ID3D12Resource* m_pMaterialBuffer;
 
-		// マテリアルディスクリプターヒープ
+		// マテリアル用ディスクリプターヒープ
 		ID3D12DescriptorHeap* m_pMaterialDescHeap;
 
 		// マテリアル実体
