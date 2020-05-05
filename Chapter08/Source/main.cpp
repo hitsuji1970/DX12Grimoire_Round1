@@ -454,7 +454,8 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		_cmdList->SetDescriptorHeaps(1, materialDescHeap);
 
 		auto materialH = materialDescHeap[0]->GetGPUDescriptorHandleForHeapStart();
-		auto cbvsrvIncSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) * 2;
+		auto cbvsrvIncSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		cbvsrvIncSize *= pmd::PMDMesh::NUMBER_OF_DESCRIPTER;
 		unsigned int idxOffset = 0;
 		for (auto& m : mesh.GetMaterials()) {
 			_cmdList->SetGraphicsRootDescriptorTable(1, materialH);

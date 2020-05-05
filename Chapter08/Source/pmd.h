@@ -78,10 +78,13 @@ namespace pmd
 	{
 	public:
 		// 頂点データのサイズ
-		static const size_t VERTEX_SIZE = 38;
+		static constexpr size_t VERTEX_SIZE = 38;
 
 		// 頂点レイアウト
 		static const std::vector<D3D12_INPUT_ELEMENT_DESC> INPUT_LAYOUT;
+
+		// シェーダーリソース用ディスクリプターの数
+		static constexpr size_t NUMBER_OF_DESCRIPTER = 2;
 
 		PMDMesh();
 		virtual ~PMDMesh();
