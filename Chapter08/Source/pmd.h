@@ -161,6 +161,9 @@ namespace pmd
 		// マテリアル実体
 		std::vector<Material> m_materials;
 
+		// 白テクスチャー
+		ID3D12Resource* m_pWhiteTexture;
+
 	private:
 		// ファイル名文字列から拡張子を取得
 		std::wstring GetExtension(const std::wstring& path);

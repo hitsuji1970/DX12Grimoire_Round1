@@ -51,7 +51,7 @@ namespace pmd
 		m_numberOfVertex(0), m_pVertexBuffer(nullptr), m_vertexBufferView{},
 		m_numberOfIndex(0), m_pIndexBuffer(nullptr), m_indexBufferView{},
 		m_numberOfMaterial(0), m_pMaterialBuffer(nullptr),
-		m_pMaterialDescHeap(nullptr), m_materials{}
+		m_pMaterialDescHeap(nullptr), m_materials{}, m_pWhiteTexture(nullptr)
 	{
 	}
 
@@ -235,7 +235,8 @@ namespace pmd
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MipLevels = 1;
 
-		auto whiteTex = CreateWhiteTexture(pD3D12Device);
+		m_pWhiteTexture = CreateWhiteTexture(pD3D12Device);
+
 		auto matDescHeapH = m_pMaterialDescHeap->GetCPUDescriptorHandleForHeapStart();
 		auto inc = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		for (auto i = 0u; i < m_numberOfMaterial; i++) {
@@ -250,8 +251,8 @@ namespace pmd
 			}
 			else
 			{
-				srvDesc.Format = whiteTex->GetDesc().Format;
-				pD3D12Device->CreateShaderResourceView(whiteTex, &srvDesc, matDescHeapH);
+				srvDesc.Format = m_pWhiteTexture->GetDesc().Format;
+				pD3D12Device->CreateShaderResourceView(m_pWhiteTexture, &srvDesc, matDescHeapH);
 			}
 			matDescHeapH.ptr += inc;
 		}
@@ -413,6 +414,11 @@ namespace pmd
 		if (m_pMaterialDescHeap) {
 			m_pMaterialDescHeap->Release();
 			m_pMaterialDescHeap = nullptr;
+		}
+
+		if (m_pWhiteTexture) {
+			m_pWhiteTexture->Release();
+			m_pWhiteTexture = nullptr;
 		}
 	}
 } // namespace pmd
