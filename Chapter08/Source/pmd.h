@@ -1,4 +1,6 @@
-﻿#include <d3d12.h>
+﻿#pragma once;
+
+#include <d3d12.h>
 #include <DirectXMath.h>
 #include <Windows.h>
 #include <string>
@@ -62,14 +64,32 @@ namespace pmd
 		BasicMatrial basicMaterial;
 		AdditionalMaterial additionalMaterial;
 		ID3D12Resource* pTextureResource;
+		ID3D12Resource* pSPHResource;
+		ID3D12Resource* pSPAResource;
 
-		Material() : indicesNum(0), basicMaterial(), additionalMaterial(), pTextureResource(nullptr){}
+		Material() :
+			indicesNum(0), basicMaterial(), additionalMaterial(),
+			pTextureResource(nullptr), pSPHResource(nullptr), pSPAResource(nullptr)
+		{
+		}
+
 		~Material()
 		{
 			if (pTextureResource)
 			{
 				pTextureResource->Release();
 				pTextureResource = nullptr;
+			}
+
+			if (pSPHResource)
+			{
+				pSPHResource->Release();
+				pSPHResource = nullptr;
+			}
+
+			if (pSPAResource) {
+				pSPAResource->Release();
+				pSPAResource = nullptr;
 			}
 		}
 	};
@@ -165,12 +185,6 @@ namespace pmd
 		ID3D12Resource* m_pWhiteTexture;
 
 	private:
-		// ファイル名文字列から拡張子を取得
-		std::wstring GetExtension(const std::wstring& path);
-
-		// '*'で区切られたテクスチャーファイル名を分割
-		std::pair<std::wstring, std::wstring> SplitFileName(const std::wstring& src, const wchar_t separator = L'*');
-
 		// テクスチャーをファイルからロード
 		ID3D12Resource* LoadTextureFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename);
 

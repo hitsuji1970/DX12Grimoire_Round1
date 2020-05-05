@@ -148,9 +148,11 @@
   <ItemGroup>
     <ClCompile Include="Source\main.cpp" />
     <ClCompile Include="Source\pmd.cpp" />
+    <ClCompile Include="Source\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\pmd.h" />
+    <ClInclude Include="Source\utils.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Source\BasicPixelShader.hlsl">

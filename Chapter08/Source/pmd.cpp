@@ -6,6 +6,7 @@
 #include <Windows.h>
 #include <vector>
 #include "pmd.h"
+#include "utils.h"
 
 namespace pmd
 {
@@ -165,29 +166,23 @@ namespace pmd
 			m_materials[i].additionalMaterial.edgeFlg = serializedMaterials[i].edgeFlg;
 			auto len = std::strlen(serializedMaterials[i].texFilePath);
 			if (len > 0) {
-				std::wstring texPath = folderPath + L'/';
+				std::wstring texPath;
 				for (size_t j = 0; j < len; j++) {
 					wchar_t w;
 					mbtowc(&w, serializedMaterials[i].texFilePath + j, 1);
 					texPath.push_back(w);
 				}
-				if (std::count(texPath.begin(), texPath.end(), L'*') > 0) {
-					auto namePair = SplitFileName(texPath);
-					auto extension = GetExtension(namePair.first);
-					if (extension == L"sph" || extension == L"spa")
+				auto filenames = Split(texPath, L'*');
+				for (auto filename : filenames) {
+					auto ext = ::GetExtension(filename);
+					if (ext != L"sph" && ext != L"spa")
 					{
-						texPath = namePair.second;
+						m_materials[i].pTextureResource = LoadTextureFromFile(pD3D12Device, folderPath + L'/' + filename);
 					}
-					else
-					{
-						texPath = namePair.first;
-					}
-				}
-				m_materials[i].additionalMaterial.texPath = texPath;
-				m_materials[i].pTextureResource = LoadTextureFromFile(pD3D12Device, texPath);
 #ifdef _DEBUG
-				printf("material[%d]: texture=\"%s\"\n", i, serializedMaterials[i].texFilePath);
+					wprintf(L"material[%d]: texture=\"%s\"\n", i, filename.c_str());
 #endif // _DEBUG
+				}
 			}
 		}
 
@@ -260,31 +255,6 @@ namespace pmd
 		std::fclose(fp);
 		m_loadedModelPath = filename;
 		return S_OK;
-	}
-
-	/**
-	 * ファイル名から拡張子を取得
-	 */
-	std::wstring PMDMesh::GetExtension(const std::wstring& path)
-	{
-		auto index = path.rfind(L'.');
-		if (index == path.npos) {
-			return std::wstring();
-		}
-		auto offset = index + 1;
-		return path.substr(offset, path.length() - offset);
-	}
-
-	/**
-	 * '*'で区切られたテクスチャーファイル名を分割
-	 */
-	std::pair<std::wstring, std::wstring> PMDMesh::SplitFileName(const std::wstring& src, const wchar_t separator)
-	{
-		auto idx = src.find(separator);
-		std::pair<std::wstring, std::wstring> ret;
-		ret.first = src.substr(0, idx);
-		ret.second = src.substr(idx + 1, src.length() - (idx + 1));
-		return ret;
 	}
 
 	/**
