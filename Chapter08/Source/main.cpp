@@ -312,7 +312,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	descTblRanges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// テクスチャー（マテリアルと1対1）
-	descTblRanges[2].NumDescriptors = 2;
+	descTblRanges[2].NumDescriptors = pmd::PMDMesh::NUMBER_OF_TEXTURE;
 	descTblRanges[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descTblRanges[2].BaseShaderRegister = 0;
 	descTblRanges[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
