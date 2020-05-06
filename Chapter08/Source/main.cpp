@@ -463,7 +463,6 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 			idxOffset += m.indicesNum;
 		}
 
-		angle += 0.01f;
 		worldMatrix = DirectX::XMMatrixRotationY(angle);
 		mapMatrix->world = worldMatrix;
 		mapMatrix->viewproj = viewMatrix * projectionMatrix;

@@ -174,10 +174,16 @@ namespace pmd
 				}
 				auto filenames = Split(texPath, L'*');
 				for (auto filename : filenames) {
+					auto path = folderPath + L'/' + filename;
 					auto ext = ::GetExtension(filename);
-					if (ext != L"sph" && ext != L"spa")
-					{
-						m_materials[i].pTextureResource = LoadTextureFromFile(pD3D12Device, folderPath + L'/' + filename);
+					if (ext == L"sph") {
+						m_materials[i].pSPHResource = LoadTextureFromFile(pD3D12Device, path);
+					}
+					else if (ext == L"spa") {
+						m_materials[i].pSPAResource = LoadTextureFromFile(pD3D12Device, path);
+					}
+					else {
+						m_materials[i].pTextureResource = LoadTextureFromFile(pD3D12Device, path);
 					}
 #ifdef _DEBUG
 					wprintf(L"material[%d]: texture=\"%s\"\n", i, filename.c_str());
@@ -201,11 +207,11 @@ namespace pmd
 			return result;
 		}
 
-		unsigned char* mappedMaterial = nullptr;
-		result = m_pMaterialBuffer->Map(0, nullptr, (void**)&mappedMaterial);
-		for (auto& m : m_materials) {
-			*reinterpret_cast<BasicMatrial*>(mappedMaterial) = m.basicMaterial;
-			mappedMaterial += materialBufferSize;
+		unsigned char* pMappedMaterial = nullptr;
+		result = m_pMaterialBuffer->Map(0, nullptr, (void**)&pMappedMaterial);
+		for (auto& material : m_materials) {
+			*reinterpret_cast<BasicMatrial*>(pMappedMaterial) = material.basicMaterial;
+			pMappedMaterial += materialBufferSize;
 		}
 
 		D3D12_DESCRIPTOR_HEAP_DESC matDescHeapDesc = {};
