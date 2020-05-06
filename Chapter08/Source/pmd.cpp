@@ -217,7 +217,7 @@ namespace pmd
 		D3D12_DESCRIPTOR_HEAP_DESC matDescHeapDesc = {};
 		matDescHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		matDescHeapDesc.NodeMask = 0;
-		matDescHeapDesc.NumDescriptors = m_numberOfMaterial * NUMBER_OF_DESCRIPTER;
+		matDescHeapDesc.NumDescriptors = m_numberOfMaterial * (1 + NUMBER_OF_TEXTURE);
 		matDescHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		result = pD3D12Device->CreateDescriptorHeap(&matDescHeapDesc, IID_PPV_ARGS(&m_pMaterialDescHeap));
 		if (FAILED(result)) {
@@ -253,6 +253,17 @@ namespace pmd
 			else
 			{
 				srvDesc.Format = m_pWhiteTexture->GetDesc().Format;
+				pD3D12Device->CreateShaderResourceView(m_pWhiteTexture, &srvDesc, matDescHeapH);
+			}
+			matDescHeapH.ptr += inc;
+
+			if (m_materials[i].pSPHResource)
+			{
+				srvDesc.Format = m_materials[i].pSPHResource->GetDesc().Format;
+				pD3D12Device->CreateShaderResourceView(m_materials[i].pSPHResource, &srvDesc, matDescHeapH);
+			}
+			else
+			{
 				pD3D12Device->CreateShaderResourceView(m_pWhiteTexture, &srvDesc, matDescHeapH);
 			}
 			matDescHeapH.ptr += inc;

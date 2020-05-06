@@ -161,7 +161,8 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 
 	pmd::PMDMesh mesh;
 	//result = mesh.LoadFromFile(_dev, L"model/初音ミク.pmd");
-	result = mesh.LoadFromFile(_dev, L"model/巡音ルカ.pmd");
+	result = mesh.LoadFromFile(_dev, L"model/初音ミクmetal.pmd");
+	//result = mesh.LoadFromFile(_dev, L"model/巡音ルカ.pmd");
 
 	// 深度バッファー
 	D3D12_RESOURCE_DESC depthResDesc = {};
@@ -195,7 +196,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 	ID3D12DescriptorHeap* dsvHeap = nullptr;
 	result = _dev->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsvHeap));
-	
+
 	// 深度ビュー
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
 	dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
@@ -295,6 +296,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		}
 	}
 
+	// 行列1 + マテリアル1 + マテリアル用テクスチャー
 	D3D12_DESCRIPTOR_RANGE descTblRanges[3] = {};
 
 	// 変換行列用レジスター0番
@@ -310,7 +312,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	descTblRanges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// テクスチャー（マテリアルと1対1）
-	descTblRanges[2].NumDescriptors = 1;
+	descTblRanges[2].NumDescriptors = 2;
 	descTblRanges[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descTblRanges[2].BaseShaderRegister = 0;
 	descTblRanges[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -454,7 +456,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 
 		auto materialH = materialDescHeap[0]->GetGPUDescriptorHandleForHeapStart();
 		auto cbvsrvIncSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		cbvsrvIncSize *= pmd::PMDMesh::NUMBER_OF_DESCRIPTER;
+		cbvsrvIncSize *= (1 + pmd::PMDMesh::NUMBER_OF_TEXTURE);
 		unsigned int idxOffset = 0;
 		for (auto& m : mesh.GetMaterials()) {
 			_cmdList->SetGraphicsRootDescriptorTable(1, materialH);
@@ -463,6 +465,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 			idxOffset += m.indicesNum;
 		}
 
+		//angle += 0.01f;
 		worldMatrix = DirectX::XMMatrixRotationY(angle);
 		mapMatrix->world = worldMatrix;
 		mapMatrix->viewproj = viewMatrix * projectionMatrix;

@@ -103,8 +103,8 @@ namespace pmd
 		// 頂点レイアウト
 		static const std::vector<D3D12_INPUT_ELEMENT_DESC> INPUT_LAYOUT;
 
-		// シェーダーリソース用ディスクリプターの数
-		static constexpr size_t NUMBER_OF_DESCRIPTER = 2;
+		// シェーダーリソース用テクスチャーの数
+		static constexpr size_t NUMBER_OF_TEXTURE = 2;
 
 		PMDMesh();
 		virtual ~PMDMesh();
