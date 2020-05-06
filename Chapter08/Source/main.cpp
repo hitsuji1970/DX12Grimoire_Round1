@@ -523,9 +523,22 @@ HWND InitWindow(WNDCLASSEX* const pWndClass)
 
 LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
-	if (msg == WM_DESTROY) {
+	switch (msg)
+	{
+	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;
+	case WM_KEYDOWN:
+		switch (wparam)
+		{
+		case VK_ESCAPE:
+			PostQuitMessage(0);
+			return 0;
+		default:
+			break;
+		}
+	default:
+		break;
 	}
 
 	return DefWindowProc(hwnd, msg, wparam, lparam);
