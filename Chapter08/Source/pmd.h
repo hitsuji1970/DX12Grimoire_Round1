@@ -188,9 +188,6 @@ namespace pmd
 		// テクスチャーをファイルからロード
 		ID3D12Resource* LoadTextureFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename);
 
-		// 白1色のテクスチャーを生成
-		ID3D12Resource* CreateWhiteTexture(ID3D12Device* const pD3D12Device);
-
 		// リソースの破棄
 		void ClearResources();
 	};
