@@ -19,6 +19,9 @@
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "DirectXTex.lib")
 
+// モデルデータ読み込みパス
+const std::wstring ModelPath = L"D:/MikuMikuDance_v932x64/UserFile/Model";
+
 // 関数プロトタイプ
 HWND InitWindow(WNDCLASSEX* const pWndClass);
 LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
@@ -244,9 +247,9 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	_dev->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
 
 	pmd::PMDMesh mesh;
-	result = mesh.LoadFromFile(_dev, L"model/初音ミク.pmd");
-	//result = mesh.LoadFromFile(_dev, L"model/初音ミクmetal.pmd");
-	//result = mesh.LoadFromFile(_dev, L"model/巡音ルカ.pmd");
+	result = mesh.LoadFromFile(_dev, ModelPath + L"/初音ミク.pmd");
+	//result = mesh.LoadFromFile(_dev, ModelPath + L"/初音ミクmetal.pmd");
+	//result = mesh.LoadFromFile(_dev, ModelPath + L"/巡音ルカ.pmd");
 
 	// シェーダー
 	ID3DBlob* _vsBlob = nullptr;
