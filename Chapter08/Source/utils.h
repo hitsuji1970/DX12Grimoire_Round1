@@ -24,7 +24,22 @@ std::vector<std::basic_string<T>> Split(std::basic_string<T> str, T separator)
 }
 
 /**
- * 入力ファイル名から拡張子を取得
+ * std::stringをstd::wstringに変換
+ */
+std::wstring GetWString(const std::string& srcString);
+
+/**
+ * null終端文字列をstd::wstringに変換
+ */
+std::wstring GetWString(const char* const rawString, size_t length);
+
+/**
+ * 入力ファイル名から拡張子を取得(std::string)
+ */
+std::string GetExtension(const std::string& path);
+
+/**
+ * 入力ファイル名から拡張子を取得(std::wstring)
  */
 std::wstring GetExtension(const std::wstring& path);
 

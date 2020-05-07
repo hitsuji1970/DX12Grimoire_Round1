@@ -4,6 +4,7 @@
 #include <DirectXMath.h>
 #include <Windows.h>
 #include <string>
+#include <map>
 
 namespace pmd
 {
@@ -75,22 +76,7 @@ namespace pmd
 
 		~Material()
 		{
-			if (pTextureResource)
-			{
-				pTextureResource->Release();
-				pTextureResource = nullptr;
-			}
-
-			if (pSPHResource)
-			{
-				pSPHResource->Release();
-				pSPHResource = nullptr;
-			}
-
-			if (pSPAResource) {
-				pSPAResource->Release();
-				pSPAResource = nullptr;
-			}
+			// テクスチャーリソースの解放はm_SharedResourcesの側で行う
 		}
 	};
 
@@ -186,6 +172,9 @@ namespace pmd
 
 		// 黒テクスチャー
 		ID3D12Resource* m_pBlackTexture;
+
+		// 共有リソース
+		std::map<std::wstring, ID3D12Resource*> m_SharedResources;
 
 	private:
 		// テクスチャーをファイルからロード

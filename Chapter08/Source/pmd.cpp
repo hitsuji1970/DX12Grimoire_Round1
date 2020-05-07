@@ -175,12 +175,7 @@ namespace pmd
 			m_materials[i].additionalMaterial.edgeFlg = serializedMaterials[i].edgeFlg;
 			auto len = std::strlen(serializedMaterials[i].texFilePath);
 			if (len > 0) {
-				std::wstring texPath;
-				for (size_t j = 0; j < len; j++) {
-					wchar_t w;
-					mbtowc(&w, serializedMaterials[i].texFilePath + j, 1);
-					texPath.push_back(w);
-				}
+				std::wstring texPath = GetWString(serializedMaterials[i].texFilePath, len);
 				auto filenames = Split(texPath, L'*');
 				for (auto filename : filenames) {
 					auto path = folderPath + L'/' + filename;
@@ -194,7 +189,6 @@ namespace pmd
 					else {
 						m_materials[i].pTextureResource = LoadTextureFromFile(pD3D12Device, path);
 					}
-
 #ifdef _DEBUG
 					wprintf(L"material[%d]: texture=\"%s\"\n", i, filename.c_str());
 #endif // _DEBUG
@@ -250,11 +244,12 @@ namespace pmd
 		m_pBlackTexture = CreateSingleColorTexture(pD3D12Device, 0x00, 0x00, 0x00, 0xff);
 
 		auto matDescHeapH = m_pMaterialDescHeap->GetCPUDescriptorHandleForHeapStart();
-		auto inc = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		auto incSize = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		for (auto i = 0u; i < m_numberOfMaterial; i++) {
 			pD3D12Device->CreateConstantBufferView(&matCBVDesc, matDescHeapH);
-			matDescHeapH.ptr += inc;
+			matDescHeapH.ptr += incSize;
 
+			// ディフューズ色テクスチャー
 			matCBVDesc.BufferLocation += materialBufferSize;
 			if (m_materials[i].pTextureResource)
 			{
@@ -266,8 +261,9 @@ namespace pmd
 				srvDesc.Format = m_pWhiteTexture->GetDesc().Format;
 				pD3D12Device->CreateShaderResourceView(m_pWhiteTexture, &srvDesc, matDescHeapH);
 			}
-			matDescHeapH.ptr += inc;
+			matDescHeapH.ptr += incSize;
 
+			// 乗算スフィアマップテクスチャー
 			if (m_materials[i].pSPHResource)
 			{
 				srvDesc.Format = m_materials[i].pSPHResource->GetDesc().Format;
@@ -278,8 +274,9 @@ namespace pmd
 				srvDesc.Format = m_pWhiteTexture->GetDesc().Format;
 				pD3D12Device->CreateShaderResourceView(m_pWhiteTexture, &srvDesc, matDescHeapH);
 			}
-			matDescHeapH.ptr += inc;
+			matDescHeapH.ptr += incSize;
 
+			// 加算スフィアマップテクスチャー
 			if (m_materials[i].pSPAResource)
 			{
 				srvDesc.Format = m_materials[i].pSPAResource->GetDesc().Format;
@@ -290,7 +287,7 @@ namespace pmd
 				srvDesc.Format = m_pBlackTexture->GetDesc().Format;
 				pD3D12Device->CreateShaderResourceView(m_pBlackTexture, &srvDesc, matDescHeapH);
 			}
-			matDescHeapH.ptr += inc;
+			matDescHeapH.ptr += incSize;
 		}
 
 		std::fclose(fp);
@@ -303,6 +300,11 @@ namespace pmd
 	 */
 	ID3D12Resource* PMDMesh::LoadTextureFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename)
 	{
+		auto it = m_SharedResources.find(filename);
+		if (it != m_SharedResources.end()) {
+			return it->second;
+		}
+
 		DirectX::TexMetadata metadata = {};
 		DirectX::ScratchImage scratchImg = {};
 		HRESULT result;
@@ -365,11 +367,11 @@ namespace pmd
 		resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 		resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
-		ID3D12Resource* texBuff = nullptr;
+		ID3D12Resource* pTextureResource = nullptr;
 		result = pD3D12Device->CreateCommittedResource(
 			&texHeapProp, D3D12_HEAP_FLAG_NONE,
 			&resDesc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-			nullptr, IID_PPV_ARGS(&texBuff)
+			nullptr, IID_PPV_ARGS(&pTextureResource)
 		);
 
 		if (FAILED(result))
@@ -380,14 +382,16 @@ namespace pmd
 
 		auto rowPitch = static_cast<UINT>(img->rowPitch);
 		auto slicePitch = static_cast<UINT>(img->slicePitch);
-		result = texBuff->WriteToSubresource(0, nullptr, img->pixels, rowPitch, slicePitch);
+		result = pTextureResource->WriteToSubresource(0, nullptr, img->pixels, rowPitch, slicePitch);
 		if (FAILED(result))
 		{
 			wprintf(L"failed to create resource : %s\n", filename.c_str());
 			return nullptr;
 		}
 
-		return texBuff;
+		m_SharedResources.emplace(filename, pTextureResource);
+
+		return pTextureResource;
 	}
 
 	/**
@@ -424,5 +428,11 @@ namespace pmd
 			m_pBlackTexture->Release();
 			m_pBlackTexture = nullptr;
 		}
+
+		for (auto res : m_SharedResources)
+		{
+			res.second->Release();
+		}
+		m_SharedResources.clear();
 	}
 } // namespace pmd

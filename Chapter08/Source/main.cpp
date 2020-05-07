@@ -20,7 +20,9 @@
 #pragma comment(lib, "DirectXTex.lib")
 
 // モデルデータ読み込みパス
-const std::wstring ModelPath = L"D:/MikuMikuDance_v932x64/UserFile/Model";
+const std::wstring MMDDataPath = L"D:/MikuMikuDance_v932x64";
+const std::wstring ModelPath = MMDDataPath + L"/UserFile/Model";
+const std::wstring ToonBmpPath = MMDDataPath + L"/Data";
 
 // 関数プロトタイプ
 HWND InitWindow(WNDCLASSEX* const pWndClass);
