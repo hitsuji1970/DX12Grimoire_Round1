@@ -7,6 +7,8 @@ SamplerState smp : register(s0);
 cbuffer Matrix : register(b0)
 {
 	matrix world;
+	matrix view;
+	matrix proj;
 	matrix viewproj;
 };
 
@@ -19,6 +21,7 @@ cbuffer Material : register(b1)
 
 struct VSOutput {
 	float4 svpos : SV_POSITION;
-	float4 normal : NORMAL;
+	float4 normal : NORMAL0;
+	float4 vnormal : NORMAL1;
 	float2 uv : TEXCOORD;
 };

@@ -10,6 +10,7 @@ VSOutput BasicVS(
 	VSOutput output;
 	output.svpos = mul(mul(viewproj, world), pos);
 	output.normal = mul(world, float4(normal.xyz, 0));
+	output.vnormal = mul(view, output.normal);
 	output.uv = uv;
 	return output;
 }

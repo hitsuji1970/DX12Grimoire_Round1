@@ -41,7 +41,9 @@ ID3D12CommandQueue* _cmdQueue = nullptr;
 struct MatricesData
 {
 	DirectX::XMMATRIX world;
-	DirectX::XMMATRIX viewproj;
+	DirectX::XMMATRIX view;
+	DirectX::XMMATRIX proj;
+	DirectX::XMMATRIX viewProj;
 };
 
 #ifdef _DEBUG
@@ -465,10 +467,12 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 			idxOffset += m.indicesNum;
 		}
 
-		//angle += 0.01f;
+		angle += 0.01f;
 		worldMatrix = DirectX::XMMatrixRotationY(angle);
 		mapMatrix->world = worldMatrix;
-		mapMatrix->viewproj = viewMatrix * projectionMatrix;
+		mapMatrix->view = viewMatrix;
+		mapMatrix->proj = projectionMatrix;
+		mapMatrix->viewProj = viewMatrix * projectionMatrix;
 
 		_cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
 			_backBuffers[bbIdx], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
