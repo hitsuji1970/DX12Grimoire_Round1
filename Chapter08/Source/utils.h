@@ -46,5 +46,9 @@ std::wstring GetExtension(const std::wstring& path);
 /**
  * 単一色のテクスチャーを生成
  */
-ID3D12Resource* CreateSingleColorTexture(ID3D12Device* pD3D12Device, UINT8 r, UINT8 g, UINT8 b, UINT8 a);
+ID3D12Resource* CreateSingleColorTexture(ID3D12Device* const pD3D12Device, UINT8 r, UINT8 g, UINT8 b, UINT8 a);
 
+/**
+ * 白黒のグラデーションテクスチャーを生成
+ */
+ID3D12Resource* CreateGrayGradationTexture(ID3D12Device* const pD3D12Device);

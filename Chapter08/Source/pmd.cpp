@@ -242,6 +242,7 @@ namespace pmd
 
 		m_pWhiteTexture = CreateSingleColorTexture(pD3D12Device, 0xff, 0xff, 0xff, 0xff);
 		m_pBlackTexture = CreateSingleColorTexture(pD3D12Device, 0x00, 0x00, 0x00, 0xff);
+		m_pGradTexture = CreateGrayGradationTexture(pD3D12Device);
 
 		auto matDescHeapH = m_pMaterialDescHeap->GetCPUDescriptorHandleForHeapStart();
 		auto incSize = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -427,6 +428,11 @@ namespace pmd
 		if (m_pBlackTexture) {
 			m_pBlackTexture->Release();
 			m_pBlackTexture = nullptr;
+		}
+		
+		if (m_pGradTexture) {
+			m_pGradTexture->Release();
+			m_pGradTexture = nullptr;
 		}
 
 		for (auto res : m_SharedResources)

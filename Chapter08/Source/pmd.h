@@ -173,6 +173,9 @@ namespace pmd
 		// 黒テクスチャー
 		ID3D12Resource* m_pBlackTexture;
 
+		// 白黒のグラデーションテクスチャー
+		ID3D12Resource* m_pGradTexture;
+
 		// 共有リソース
 		std::map<std::wstring, ID3D12Resource*> m_SharedResources;
 
