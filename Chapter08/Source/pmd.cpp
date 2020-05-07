@@ -1,10 +1,18 @@
-﻿#include <algorithm>
+﻿// std
+#include <algorithm>
+#include <iostream>
+#include <functional>
+#include <map>
+#include <vector>
+
+// Windows
+#include <Windows.h>
+#include <tchar.h>
+
+// DirectX
 #include <d3dx12.h>
 #include <DirectXTex.h>
-#include <tchar.h>
-#include <iostream>
-#include <Windows.h>
-#include <vector>
+
 #include "pmd.h"
 #include "utils.h"
 
@@ -186,6 +194,7 @@ namespace pmd
 					else {
 						m_materials[i].pTextureResource = LoadTextureFromFile(pD3D12Device, path);
 					}
+
 #ifdef _DEBUG
 					wprintf(L"material[%d]: texture=\"%s\"\n", i, filename.c_str());
 #endif // _DEBUG
@@ -298,8 +307,37 @@ namespace pmd
 		DirectX::ScratchImage scratchImg = {};
 		HRESULT result;
 
-		result = DirectX::LoadFromWICFile(filename.c_str(), DirectX::WIC_FLAGS_NONE, &metadata, scratchImg);
+		// テクスチャー読み込み関数テーブル
+		using LoadLambda_t = std::function<HRESULT(const std::wstring& path, DirectX::TexMetadata*, DirectX::ScratchImage&)>;
+		std::map<std::wstring, LoadLambda_t> loadLambdaTable;
+		loadLambdaTable[L"sph"]
+			= loadLambdaTable[L"spa"]
+			= loadLambdaTable[L"bmp"]
+			= loadLambdaTable[L"png"]
+			= loadLambdaTable[L"jpg"]
+			= [](const std::wstring& path, DirectX::TexMetadata* meta, DirectX::ScratchImage& img)
+			-> HRESULT
+		{
+			return LoadFromWICFile(path.c_str(), DirectX::WIC_FLAGS_NONE, meta, img);
+		};
 
+		loadLambdaTable[L"tga"]
+			= [](const std::wstring& path, DirectX::TexMetadata* meta, DirectX::ScratchImage& img)
+			-> HRESULT
+		{
+			return LoadFromTGAFile(path.c_str(), meta, img);
+		};
+
+		loadLambdaTable[L"dds"]
+			= [](const std::wstring& path, DirectX::TexMetadata* meta, DirectX::ScratchImage& img)
+			-> HRESULT
+		{
+			return LoadFromDDSFile(path.c_str(), 0, meta, img);
+		};
+
+		// 読み込み
+		auto ext = GetExtension(filename);
+		result = loadLambdaTable[ext](filename, &metadata, scratchImg);
 		if (FAILED(result))
 		{
 			wprintf(L"load failed. : %s\n", filename.c_str());
