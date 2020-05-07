@@ -14,7 +14,7 @@ std::wstring GetExtension(const std::wstring& path)
 }
 
 /**
- * 白テクスチャーを生成
+ * 単一色のテクスチャーを生成
  */
 ID3D12Resource* CreateSingleColorTexture(ID3D12Device* pD3D12Device, UINT8 r, UINT8 g, UINT8 b, UINT8 a)
 {
@@ -51,7 +51,7 @@ ID3D12Resource* CreateSingleColorTexture(ID3D12Device* pD3D12Device, UINT8 r, UI
 	}
 
 	std::vector<unsigned char> data(4 * 4 * 4);
-	for (int i = 0; i < 4 * 4; i++) {
+	for (size_t i = 0; i < 4 * 4; i++) {
 		data[i * 4 + 0] = r;
 		data[i * 4 + 1] = g;
 		data[i * 4 + 2] = b;

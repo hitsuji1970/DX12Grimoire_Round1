@@ -29,7 +29,7 @@ std::vector<std::basic_string<T>> Split(std::basic_string<T> str, T separator)
 std::wstring GetExtension(const std::wstring& path);
 
 /**
- * 白テクスチャーを生成
+ * 単一色のテクスチャーを生成
  */
 ID3D12Resource* CreateSingleColorTexture(ID3D12Device* pD3D12Device, UINT8 r, UINT8 g, UINT8 b, UINT8 a);
 
