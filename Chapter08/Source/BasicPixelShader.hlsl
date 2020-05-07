@@ -10,6 +10,7 @@ float4 BasicPS(VSOutput input) : SV_TARGET
 
 	// ディフューズ
 	float diffuseBrightness = dot(-light, input.normal.xyz);
+	float4 toonDif = toon.Sample(smp, float2(0, 1.0 - diffuseBrightness));
 
 	// 光の反射ベクトル
 	float3 refLight = normalize(reflect(light, input.normal.xyz));
@@ -22,7 +23,7 @@ float4 BasicPS(VSOutput input) : SV_TARGET
 	float4 texColor = tex.Sample(smp, input.uv);
 
 	return max(
-		diffuseBrightness * diffuse * texColor
+		toonDif * diffuse * texColor
 		* sph.Sample(smp, sphereMapUV)
 		+ spa.Sample(smp, sphereMapUV) * texColor
 		+ float4(specularBrightness * specular.rgb, 1)

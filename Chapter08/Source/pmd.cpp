@@ -76,7 +76,7 @@ namespace pmd
 	/**
 	 * PMDファイルからの読み込み
 	 */
-	HRESULT PMDMesh::LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename)
+	HRESULT PMDMesh::LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename, const std::wstring& toonTexturePath)
 	{
 		HRESULT result;
 		FILE* fp = nullptr;
@@ -194,6 +194,11 @@ namespace pmd
 #endif // _DEBUG
 				}
 			}
+
+			char toonFileName[16];
+			sprintf_s(toonFileName, "/toon%02d.bmp", serializedMaterials[i].toonIdx + 1);
+			//printf("toon idx: %d\n", serializedMaterials[i].toonIdx);
+			m_materials[i].pToonResource = LoadTextureFromFile(pD3D12Device, toonTexturePath + GetWString(toonFileName));
 		}
 
 		auto materialBufferSize = sizeof(BasicMatrial);
@@ -287,6 +292,19 @@ namespace pmd
 			{
 				srvDesc.Format = m_pBlackTexture->GetDesc().Format;
 				pD3D12Device->CreateShaderResourceView(m_pBlackTexture, &srvDesc, matDescHeapH);
+			}
+			matDescHeapH.ptr += incSize;
+
+			// トゥーンテクスチャー
+			if (m_materials[i].pToonResource)
+			{
+				srvDesc.Format = m_materials[i].pToonResource->GetDesc().Format;
+				pD3D12Device->CreateShaderResourceView(m_materials[i].pToonResource, &srvDesc, matDescHeapH);
+			}
+			else
+			{
+				srvDesc.Format = m_pGradTexture->GetDesc().Format;
+				pD3D12Device->CreateShaderResourceView(m_pGradTexture, &srvDesc, matDescHeapH);
 			}
 			matDescHeapH.ptr += incSize;
 		}

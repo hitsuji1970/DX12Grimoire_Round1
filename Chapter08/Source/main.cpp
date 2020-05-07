@@ -249,7 +249,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	_dev->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
 
 	pmd::PMDMesh mesh;
-	result = mesh.LoadFromFile(_dev, ModelPath + L"/初音ミク.pmd");
+	result = mesh.LoadFromFile(_dev, ModelPath + L"/初音ミク.pmd", ToonBmpPath);
 	//result = mesh.LoadFromFile(_dev, ModelPath + L"/初音ミクmetal.pmd");
 	//result = mesh.LoadFromFile(_dev, ModelPath + L"/巡音ルカ.pmd");
 

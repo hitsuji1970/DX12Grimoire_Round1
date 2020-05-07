@@ -67,10 +67,12 @@ namespace pmd
 		ID3D12Resource* pTextureResource;
 		ID3D12Resource* pSPHResource;
 		ID3D12Resource* pSPAResource;
+		ID3D12Resource* pToonResource;
 
 		Material() :
 			indicesNum(0), basicMaterial(), additionalMaterial(),
-			pTextureResource(nullptr), pSPHResource(nullptr), pSPAResource(nullptr)
+			pTextureResource(nullptr), pSPHResource(nullptr), pSPAResource(nullptr),
+			pToonResource(nullptr)
 		{
 		}
 
@@ -90,12 +92,12 @@ namespace pmd
 		static const std::vector<D3D12_INPUT_ELEMENT_DESC> INPUT_LAYOUT;
 
 		// シェーダーリソース用テクスチャーの数
-		static constexpr size_t NUMBER_OF_TEXTURE = 3;
+		static constexpr size_t NUMBER_OF_TEXTURE = 4;
 
 		PMDMesh();
 		virtual ~PMDMesh();
 
-		HRESULT LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename);
+		HRESULT LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename, const std::wstring& toonTexturePath);
 
 		unsigned int GetNumberOfVertex()
 		{
