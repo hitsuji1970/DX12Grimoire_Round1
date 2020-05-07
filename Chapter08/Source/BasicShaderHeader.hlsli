@@ -10,6 +10,7 @@ cbuffer Matrix : register(b0)
 	matrix view;
 	matrix proj;
 	matrix viewproj;
+	float3 eye;
 };
 
 cbuffer Material : register(b1)
@@ -24,4 +25,5 @@ struct VSOutput {
 	float4 normal : NORMAL0;
 	float4 vnormal : NORMAL1;
 	float2 uv : TEXCOORD;
+	float3 ray : VECTOR;
 };

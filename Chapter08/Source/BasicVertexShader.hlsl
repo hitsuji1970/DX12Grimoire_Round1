@@ -12,5 +12,6 @@ VSOutput BasicVS(
 	output.normal = mul(world, float4(normal.xyz, 0));
 	output.vnormal = mul(view, output.normal);
 	output.uv = uv;
+	output.ray = normalize(pos.xyz - eye);
 	return output;
 }

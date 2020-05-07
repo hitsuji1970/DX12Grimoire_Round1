@@ -38,12 +38,13 @@ ID3D12GraphicsCommandList* _cmdList = nullptr;
 ID3D12CommandQueue* _cmdQueue = nullptr;
 
 // シェーダーに渡す行列
-struct MatricesData
+struct SceneMatrix
 {
 	DirectX::XMMATRIX world;
 	DirectX::XMMATRIX view;
 	DirectX::XMMATRIX proj;
 	DirectX::XMMATRIX viewProj;
+	DirectX::XMFLOAT3 eye;
 };
 
 #ifdef _DEBUG
@@ -203,25 +204,25 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 
 	// 定数バッファーに行列を設定
 	auto worldMatrix = DirectX::XMMatrixRotationY(DirectX::XM_PIDIV4);
-	DirectX::XMFLOAT3 eye(0, 10, -15);
-	DirectX::XMFLOAT3 target(0, 10, 0);
+	DirectX::XMFLOAT3 eye(0, 15, -15);
+	DirectX::XMFLOAT3 target(0, 15, 0);
 	DirectX::XMFLOAT3 up(0, 1, 0);
 
 	auto viewMatrix = DirectX::XMMatrixLookAtLH(DirectX::XMLoadFloat3(&eye), DirectX::XMLoadFloat3(&target), DirectX::XMLoadFloat3(&up));
-	auto projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV2, static_cast<float>(window_width) / static_cast<float>(window_height), 1.0f, 100.f);
+	auto projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV4, static_cast<float>(window_width) / static_cast<float>(window_height), 1.0f, 100.f);
 
 	// 定数バッファー
 	ID3D12Resource* constBuff = nullptr;
 	result = _dev->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(MatricesData) + 0xff) & ~0xff),
+		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(SceneMatrix) + 0xff) & ~0xff),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&constBuff));
 
 	// 行列をコピー
-	MatricesData* mapMatrix;
+	SceneMatrix* mapMatrix;
 	result = constBuff->Map(0, nullptr, (void**)&mapMatrix);
 
 	// シェーダーリソースビュー
@@ -243,9 +244,9 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	_dev->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
 
 	pmd::PMDMesh mesh;
-	//result = mesh.LoadFromFile(_dev, L"model/初音ミク.pmd");
+	result = mesh.LoadFromFile(_dev, L"model/初音ミク.pmd");
 	//result = mesh.LoadFromFile(_dev, L"model/初音ミクmetal.pmd");
-	result = mesh.LoadFromFile(_dev, L"model/巡音ルカ.pmd");
+	//result = mesh.LoadFromFile(_dev, L"model/巡音ルカ.pmd");
 
 	// シェーダー
 	ID3DBlob* _vsBlob = nullptr;
@@ -473,6 +474,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		mapMatrix->view = viewMatrix;
 		mapMatrix->proj = projectionMatrix;
 		mapMatrix->viewProj = viewMatrix * projectionMatrix;
+		mapMatrix->eye = eye;
 
 		_cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
 			_backBuffers[bbIdx], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
