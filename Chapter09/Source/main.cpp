@@ -305,54 +305,32 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	}
 
 	// 行列1 + マテリアル1 + マテリアル用テクスチャー
-	D3D12_DESCRIPTOR_RANGE descTblRanges[3] = {};
+	CD3DX12_DESCRIPTOR_RANGE descTblRanges[3] = {};
 
 	// 変換行列用レジスター0番
-	descTblRanges[0].NumDescriptors = 1;
-	descTblRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descTblRanges[0].BaseShaderRegister = 0;
-	descTblRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	descTblRanges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
 
 	// マテリアル用レジスター1番
-	descTblRanges[1].NumDescriptors = 1;
-	descTblRanges[1].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	descTblRanges[1].BaseShaderRegister = 1;
-	descTblRanges[1].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	descTblRanges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
 
 	// テクスチャー（マテリアルと1対1）
-	descTblRanges[2].NumDescriptors = pmd::PMDMesh::NUMBER_OF_TEXTURE;
-	descTblRanges[2].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descTblRanges[2].BaseShaderRegister = 0;
-	descTblRanges[2].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	descTblRanges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, pmd::PMDMesh::NUMBER_OF_TEXTURE, 0);
 
-	D3D12_ROOT_PARAMETER rootParams[2] = {};
-	rootParams[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParams[0].DescriptorTable.pDescriptorRanges = &descTblRanges[0];
-	rootParams[0].DescriptorTable.NumDescriptorRanges = 1;
-	rootParams[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-	rootParams[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParams[1].DescriptorTable.pDescriptorRanges = &descTblRanges[1];
-	rootParams[1].DescriptorTable.NumDescriptorRanges = 2;
-	rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	CD3DX12_ROOT_PARAMETER rootParams[2] = {};
+	rootParams[0].InitAsDescriptorTable(1, &descTblRanges[0]);
+	rootParams[1].InitAsDescriptorTable(2, &descTblRanges[1], D3D12_SHADER_VISIBILITY_PIXEL);
 
 	// サンプラー設定
 	D3D12_STATIC_SAMPLER_DESC samplerDescs[2] = {};
-	samplerDescs[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-	samplerDescs[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-	samplerDescs[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplerDescs[0] = CD3DX12_STATIC_SAMPLER_DESC(0, D3D12_FILTER_MIN_MAG_MIP_POINT);
 	samplerDescs[0].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-	samplerDescs[0].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-	samplerDescs[0].MaxLOD = D3D12_FLOAT32_MAX;
-	samplerDescs[0].MinLOD = 0;
 	samplerDescs[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
 	samplerDescs[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	samplerDescs[0].ShaderRegister = 0;
 
-	samplerDescs[1] = samplerDescs[0];
+	samplerDescs[1] = CD3DX12_STATIC_SAMPLER_DESC(1);
 	samplerDescs[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 	samplerDescs[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 	samplerDescs[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	samplerDescs[1].ShaderRegister = 1;
 
 	D3D12_ROOT_SIGNATURE_DESC rootsignatureDesc = {};
 	rootsignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
@@ -379,22 +357,14 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	// パイプラインステート
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
 	pipelineStateDesc.pRootSignature = rootSignature;
-	pipelineStateDesc.VS.pShaderBytecode = _vsBlob->GetBufferPointer();
-	pipelineStateDesc.VS.BytecodeLength = _vsBlob->GetBufferSize();
-	pipelineStateDesc.PS.pShaderBytecode = _psBlob->GetBufferPointer();
-	pipelineStateDesc.PS.BytecodeLength = _psBlob->GetBufferSize();
+	pipelineStateDesc.VS = CD3DX12_SHADER_BYTECODE(_vsBlob);
+	pipelineStateDesc.PS = CD3DX12_SHADER_BYTECODE(_psBlob);
 	pipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
-	pipelineStateDesc.DepthStencilState.DepthEnable = true;
-	pipelineStateDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-	pipelineStateDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-	pipelineStateDesc.DepthStencilState.StencilEnable = false;
+	pipelineStateDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 	pipelineStateDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-	pipelineStateDesc.RasterizerState.MultisampleEnable = false;
+	pipelineStateDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	pipelineStateDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-	pipelineStateDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
-	pipelineStateDesc.RasterizerState.DepthClipEnable = true;
-	pipelineStateDesc.BlendState.AlphaToCoverageEnable = false;
-	pipelineStateDesc.BlendState.IndependentBlendEnable = false;
+	pipelineStateDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 
 	D3D12_RENDER_TARGET_BLEND_DESC renderTargetBlendDesc = {};
 	renderTargetBlendDesc.BlendEnable = false;
