@@ -16,7 +16,7 @@ std::wstring GetExtension(const std::wstring& path)
 /**
  * 白テクスチャーを生成
  */
-ID3D12Resource* CreateWhiteTexture(ID3D12Device* pD3D12Device)
+ID3D12Resource* CreateSingleColorTexture(ID3D12Device* pD3D12Device, UINT8 r, UINT8 g, UINT8 b, UINT8 a)
 {
 	D3D12_HEAP_PROPERTIES texHeapProp = {};
 
@@ -51,7 +51,12 @@ ID3D12Resource* CreateWhiteTexture(ID3D12Device* pD3D12Device)
 	}
 
 	std::vector<unsigned char> data(4 * 4 * 4);
-	std::fill(data.begin(), data.end(), 0xff);
+	for (int i = 0; i < 4 * 4; i++) {
+		data[i * 4 + 0] = r;
+		data[i * 4 + 1] = g;
+		data[i * 4 + 2] = b;
+		data[i * 4 + 3] = a;
+	}
 	result = whiteTextureResource->WriteToSubresource(0, nullptr, data.data(), 4 * 4, static_cast<UINT>(data.size()));
 
 	return whiteTextureResource;

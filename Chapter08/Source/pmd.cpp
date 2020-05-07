@@ -52,7 +52,8 @@ namespace pmd
 		m_numberOfVertex(0), m_pVertexBuffer(nullptr), m_vertexBufferView{},
 		m_numberOfIndex(0), m_pIndexBuffer(nullptr), m_indexBufferView{},
 		m_numberOfMaterial(0), m_pMaterialBuffer(nullptr),
-		m_pMaterialDescHeap(nullptr), m_materials{}, m_pWhiteTexture(nullptr)
+		m_pMaterialDescHeap(nullptr), m_materials{},
+		m_pWhiteTexture(nullptr), m_pBlackTexture(nullptr)
 	{
 	}
 
@@ -236,7 +237,8 @@ namespace pmd
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MipLevels = 1;
 
-		m_pWhiteTexture = CreateWhiteTexture(pD3D12Device);
+		m_pWhiteTexture = CreateSingleColorTexture(pD3D12Device, 0xff, 0xff, 0xff, 0xff);
+		m_pBlackTexture = CreateSingleColorTexture(pD3D12Device, 0x00, 0x00, 0x00, 0xff);
 
 		auto matDescHeapH = m_pMaterialDescHeap->GetCPUDescriptorHandleForHeapStart();
 		auto inc = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -264,7 +266,20 @@ namespace pmd
 			}
 			else
 			{
+				srvDesc.Format = m_pWhiteTexture->GetDesc().Format;
 				pD3D12Device->CreateShaderResourceView(m_pWhiteTexture, &srvDesc, matDescHeapH);
+			}
+			matDescHeapH.ptr += inc;
+
+			if (m_materials[i].pSPAResource)
+			{
+				srvDesc.Format = m_materials[i].pSPAResource->GetDesc().Format;
+				pD3D12Device->CreateShaderResourceView(m_materials[i].pSPAResource, &srvDesc, matDescHeapH);
+			}
+			else
+			{
+				srvDesc.Format = m_pBlackTexture->GetDesc().Format;
+				pD3D12Device->CreateShaderResourceView(m_pBlackTexture, &srvDesc, matDescHeapH);
 			}
 			matDescHeapH.ptr += inc;
 		}
@@ -287,6 +302,7 @@ namespace pmd
 
 		if (FAILED(result))
 		{
+			wprintf(L"load failed. : %s\n", filename.c_str());
 			return nullptr;
 		}
 
@@ -320,6 +336,7 @@ namespace pmd
 
 		if (FAILED(result))
 		{
+			wprintf(L"failed to create resource : %s\n", filename.c_str());
 			return nullptr;
 		}
 
@@ -328,6 +345,7 @@ namespace pmd
 		result = texBuff->WriteToSubresource(0, nullptr, img->pixels, rowPitch, slicePitch);
 		if (FAILED(result))
 		{
+			wprintf(L"failed to create resource : %s\n", filename.c_str());
 			return nullptr;
 		}
 
@@ -362,6 +380,11 @@ namespace pmd
 		if (m_pWhiteTexture) {
 			m_pWhiteTexture->Release();
 			m_pWhiteTexture = nullptr;
+		}
+
+		if (m_pBlackTexture) {
+			m_pBlackTexture->Release();
+			m_pBlackTexture = nullptr;
 		}
 	}
 } // namespace pmd

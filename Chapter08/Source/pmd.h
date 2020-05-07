@@ -104,7 +104,7 @@ namespace pmd
 		static const std::vector<D3D12_INPUT_ELEMENT_DESC> INPUT_LAYOUT;
 
 		// シェーダーリソース用テクスチャーの数
-		static constexpr size_t NUMBER_OF_TEXTURE = 2;
+		static constexpr size_t NUMBER_OF_TEXTURE = 3;
 
 		PMDMesh();
 		virtual ~PMDMesh();
@@ -183,6 +183,9 @@ namespace pmd
 
 		// 白テクスチャー
 		ID3D12Resource* m_pWhiteTexture;
+
+		// 黒テクスチャー
+		ID3D12Resource* m_pBlackTexture;
 
 	private:
 		// テクスチャーをファイルからロード

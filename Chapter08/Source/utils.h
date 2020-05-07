@@ -31,5 +31,5 @@ std::wstring GetExtension(const std::wstring& path);
 /**
  * 白テクスチャーを生成
  */
-ID3D12Resource* CreateWhiteTexture(ID3D12Device* pD3D12Device);
+ID3D12Resource* CreateSingleColorTexture(ID3D12Device* pD3D12Device, UINT8 r, UINT8 g, UINT8 b, UINT8 a);
 

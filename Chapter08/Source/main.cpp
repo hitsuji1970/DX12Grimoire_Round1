@@ -159,11 +159,6 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 
 	ShowWindow(hWnd, SW_SHOW);
 
-	pmd::PMDMesh mesh;
-	//result = mesh.LoadFromFile(_dev, L"model/初音ミク.pmd");
-	result = mesh.LoadFromFile(_dev, L"model/初音ミクmetal.pmd");
-	//result = mesh.LoadFromFile(_dev, L"model/巡音ルカ.pmd");
-
 	// 深度バッファー
 	D3D12_RESOURCE_DESC depthResDesc = {};
 	depthResDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -244,6 +239,11 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	cbvDesc.BufferLocation = constBuff->GetGPUVirtualAddress();
 	cbvDesc.SizeInBytes = static_cast<UINT>(constBuff->GetDesc().Width);
 	_dev->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
+
+	pmd::PMDMesh mesh;
+	//result = mesh.LoadFromFile(_dev, L"model/初音ミク.pmd");
+	//result = mesh.LoadFromFile(_dev, L"model/初音ミクmetal.pmd");
+	result = mesh.LoadFromFile(_dev, L"model/巡音ルカ.pmd");
 
 	// シェーダー
 	ID3DBlob* _vsBlob = nullptr;
