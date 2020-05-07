@@ -10,7 +10,7 @@ float4 BasicPS(VSOutput input) : SV_TARGET
 
 	// ディフューズ
 	float diffuseBrightness = dot(-light, input.normal.xyz);
-	float4 toonDif = toon.Sample(smp, float2(0, 1.0 - diffuseBrightness));
+	float4 toonDif = toon.Sample(smpToon, float2(0, 1.0 - diffuseBrightness));
 
 	// 光の反射ベクトル
 	float3 refLight = normalize(reflect(light, input.normal.xyz));

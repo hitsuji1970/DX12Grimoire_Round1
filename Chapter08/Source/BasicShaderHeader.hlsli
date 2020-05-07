@@ -3,6 +3,7 @@ Texture2D<float4> sph : register(t1);
 Texture2D<float4> spa : register(t2);
 Texture2D<float4> toon : register(t3);
 SamplerState smp : register(s0);
+SamplerState smpToon : register(s1);
 
 // 定数バッファー
 cbuffer Matrix : register(b0)

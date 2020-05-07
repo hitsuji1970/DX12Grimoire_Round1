@@ -336,22 +336,30 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	rootParams[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
 	// サンプラー設定
-	D3D12_STATIC_SAMPLER_DESC samplerDesc = {};
-	samplerDesc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-	samplerDesc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-	samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-	samplerDesc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
-	samplerDesc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-	samplerDesc.MaxLOD = D3D12_SHADER_VISIBILITY_PIXEL;
-	samplerDesc.MinLOD = 0;
-	samplerDesc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+	D3D12_STATIC_SAMPLER_DESC samplerDescs[2] = {};
+	samplerDescs[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplerDescs[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplerDescs[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	samplerDescs[0].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+	samplerDescs[0].Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+	samplerDescs[0].MaxLOD = D3D12_FLOAT32_MAX;
+	samplerDescs[0].MinLOD = 0;
+	samplerDescs[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+	samplerDescs[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	samplerDescs[0].ShaderRegister = 0;
+
+	samplerDescs[1] = samplerDescs[0];
+	samplerDescs[1].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	samplerDescs[1].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	samplerDescs[1].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	samplerDescs[1].ShaderRegister = 1;
 
 	D3D12_ROOT_SIGNATURE_DESC rootsignatureDesc = {};
 	rootsignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 	rootsignatureDesc.pParameters = rootParams;
 	rootsignatureDesc.NumParameters = 2;
-	rootsignatureDesc.pStaticSamplers = &samplerDesc;
-	rootsignatureDesc.NumStaticSamplers = 1;
+	rootsignatureDesc.pStaticSamplers = samplerDescs;
+	rootsignatureDesc.NumStaticSamplers = 2;
 
 	ID3DBlob* rootSigBlob = nullptr;
 	result = D3D12SerializeRootSignature(
