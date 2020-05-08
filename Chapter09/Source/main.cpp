@@ -6,7 +6,10 @@
 #include <DirectXTex.h>
 #include <d3dx12.h>
 #include <d3dcompiler.h>
+#include <wrl.h>
 #include <vector>
+
+using namespace Microsoft::WRL;
 
 #ifdef _DEBUG
 #include <iostream>
@@ -35,12 +38,12 @@ constexpr unsigned int window_width = 1280;
 constexpr unsigned int window_height = 720;
 
 // DirextXオブジェクト
-IDXGIFactory6* _dxgiFactory = nullptr;
-ID3D12Device* _dev = nullptr;
-IDXGISwapChain4* _swapchain = nullptr;
-ID3D12CommandAllocator* _cmdAllocator = nullptr;
-ID3D12GraphicsCommandList* _cmdList = nullptr;
-ID3D12CommandQueue* _cmdQueue = nullptr;
+ComPtr<IDXGIFactory6> _dxgiFactory = nullptr;
+ComPtr<ID3D12Device> _dev = nullptr;
+ComPtr<ID3D12CommandAllocator> _cmdAllocator = nullptr;
+ComPtr<ID3D12GraphicsCommandList> _cmdList = nullptr;
+ComPtr<ID3D12CommandQueue> _cmdQueue = nullptr;
+ComPtr<IDXGISwapChain4> _swapchain = nullptr;
 
 // シェーダーに渡す行列
 struct SceneMatrix
@@ -74,19 +77,19 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 
 #ifdef _DEBUG
 	EnableDebugLayer();
-	if (FAILED(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&_dxgiFactory)))) {
-		if (FAILED(CreateDXGIFactory2(0, IID_PPV_ARGS(&_dxgiFactory)))) {
+	if (FAILED(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(_dxgiFactory.ReleaseAndGetAddressOf())))) {
+		if (FAILED(CreateDXGIFactory2(0, IID_PPV_ARGS(_dxgiFactory.ReleaseAndGetAddressOf())))) {
 			return -1;
 		}
 	}
 #else
-	if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&_dxgiFactory)))) {
+	if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(_dxgiFactory.ReleaseAndGetAddressOf())))) {
 		return -1;
 	}
 #endif // _DEBUG
-	std::vector<IDXGIAdapter*> adapters;
-	IDXGIAdapter* tmpAdapter = nullptr;
-	IDXGIAdapter* adapter = nullptr;
+	std::vector<ComPtr<IDXGIAdapter>> adapters;
+	ComPtr<IDXGIAdapter> tmpAdapter = nullptr;
+	ComPtr<IDXGIAdapter> adapter = nullptr;
 	for (int i = 0; _dxgiFactory->EnumAdapters(i, &tmpAdapter) != DXGI_ERROR_NOT_FOUND; i++) {
 		adapters.push_back(tmpAdapter);
 	}
@@ -102,7 +105,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 
 	D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_1_0_CORE;
 	for (auto lv : levels) {
-		if (D3D12CreateDevice(adapter, lv, IID_PPV_ARGS(&_dev)) == S_OK) {
+		if (D3D12CreateDevice(adapter.Get(), lv, IID_PPV_ARGS(_dev.ReleaseAndGetAddressOf())) == S_OK) {
 			featureLevel = lv;
 			break;
 		}
@@ -114,15 +117,15 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	}
 
 	// コマンドリスト
-	result = _dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&_cmdAllocator));
-	result = _dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _cmdAllocator, nullptr, IID_PPV_ARGS(&_cmdList));
+	result = _dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(_cmdAllocator.ReleaseAndGetAddressOf()));
+	result = _dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _cmdAllocator.Get(), nullptr, IID_PPV_ARGS(_cmdList.ReleaseAndGetAddressOf()));
 
 	D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
 	cmdQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 	cmdQueueDesc.NodeMask = 0;
 	cmdQueueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
 	cmdQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-	result = _dev->CreateCommandQueue(&cmdQueueDesc, IID_PPV_ARGS(&_cmdQueue));
+	result = _dev->CreateCommandQueue(&cmdQueueDesc, IID_PPV_ARGS(_cmdQueue.ReleaseAndGetAddressOf()));
 
 	// スワップチェーン
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
@@ -139,8 +142,8 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
 	swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 	result = _dxgiFactory->CreateSwapChainForHwnd(
-		_cmdQueue, hWnd, &swapChainDesc, nullptr, nullptr,
-		(IDXGISwapChain1**)&_swapchain);
+		_cmdQueue.Get(), hWnd, &swapChainDesc, nullptr, nullptr,
+		(IDXGISwapChain1**)_swapchain.ReleaseAndGetAddressOf());
 
 	// ディスクリプターヒープ
 	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
@@ -148,8 +151,8 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	heapDesc.NodeMask = 0;
 	heapDesc.NumDescriptors = 2;
 	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	ID3D12DescriptorHeap* rtvHeaps = nullptr;
-	result = _dev->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&rtvHeaps));
+	ComPtr<ID3D12DescriptorHeap> rtvHeaps = nullptr;
+	result = _dev->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(rtvHeaps.ReleaseAndGetAddressOf()));
 
 	// スワップチェーンに関連付け
 	std::vector<ID3D12Resource*> _backBuffers(swapChainDesc.BufferCount);
@@ -161,9 +164,9 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	}
 
 	// フェンス
-	ID3D12Fence* _fence = nullptr;
+	ComPtr<ID3D12Fence> _fence = nullptr;
 	UINT64 _fenceVal = 0;
-	result = _dev->CreateFence(_fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&_fence));
+	result = _dev->CreateFence(_fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(_fence.ReleaseAndGetAddressOf()));
 
 	ShowWindow(hWnd, SW_SHOW);
 
@@ -187,25 +190,25 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	depthClearValue.DepthStencil.Depth = 1.0f;
 	depthClearValue.Format = DXGI_FORMAT_D32_FLOAT;
 
-	ID3D12Resource* depthBuffer = nullptr;
+	ComPtr<ID3D12Resource> depthBuffer = nullptr;
 	result = _dev->CreateCommittedResource(
 		&depthHeapProp, D3D12_HEAP_FLAG_NONE,
 		&depthResDesc, D3D12_RESOURCE_STATE_DEPTH_WRITE,
-		&depthClearValue, IID_PPV_ARGS(&depthBuffer));
+		&depthClearValue, IID_PPV_ARGS(depthBuffer.ReleaseAndGetAddressOf()));
 
 	// 深度バッファー用のディスクリプターヒープ
 	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
 	dsvHeapDesc.NumDescriptors = 1;
 	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-	ID3D12DescriptorHeap* dsvHeap = nullptr;
-	result = _dev->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsvHeap));
+	ComPtr<ID3D12DescriptorHeap> dsvHeap = nullptr;
+	result = _dev->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(dsvHeap.ReleaseAndGetAddressOf()));
 
 	// 深度ビュー
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
 	dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 	dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
-	_dev->CreateDepthStencilView(depthBuffer, &dsvDesc, dsvHeap->GetCPUDescriptorHandleForHeapStart());
+	_dev->CreateDepthStencilView(depthBuffer.Get(), &dsvDesc, dsvHeap->GetCPUDescriptorHandleForHeapStart());
 
 	// 定数バッファーに行列を設定
 	auto worldMatrix = DirectX::XMMatrixRotationY(DirectX::XM_PIDIV4);
@@ -217,21 +220,21 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	auto projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV4, static_cast<float>(window_width) / static_cast<float>(window_height), 1.0f, 100.f);
 
 	// 定数バッファー
-	ID3D12Resource* constBuff = nullptr;
+	ComPtr<ID3D12Resource> constBuff = nullptr;
 	result = _dev->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
 		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(SceneMatrix) + 0xff) & ~0xff),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
-		IID_PPV_ARGS(&constBuff));
+		IID_PPV_ARGS(constBuff.ReleaseAndGetAddressOf()));
 
 	// 行列をコピー
 	SceneMatrix* mapMatrix;
 	result = constBuff->Map(0, nullptr, (void**)&mapMatrix);
 
 	// シェーダーリソースビュー
-	ID3D12DescriptorHeap* basicDescHeap = nullptr;
+	ComPtr<ID3D12DescriptorHeap> basicDescHeap = nullptr;
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
 	descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	descHeapDesc.NodeMask = 0;
@@ -239,7 +242,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	// CBV1つ
 	descHeapDesc.NumDescriptors = 1;
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	result = _dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&basicDescHeap));
+	result = _dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(basicDescHeap.ReleaseAndGetAddressOf()));
 	auto basicHeapHandle = basicDescHeap->GetCPUDescriptorHandleForHeapStart();
 
 	// シェーダーリソースビュー（定数バッファー）
@@ -254,9 +257,9 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	//result = mesh.LoadFromFile(_dev, ModelPath + L"/巡音ルカ.pmd");
 
 	// シェーダー
-	ID3DBlob* _vsBlob = nullptr;
-	ID3DBlob* _psBlob = nullptr;
-	ID3DBlob* errorBlob = nullptr;
+	ComPtr<ID3DBlob> _vsBlob = nullptr;
+	ComPtr<ID3DBlob> _psBlob = nullptr;
+	ComPtr<ID3DBlob> errorBlob = nullptr;
 
 	result = D3DCompileFromFile(
 		L"Source/BasicVertexShader.hlsl",
@@ -265,7 +268,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		"BasicVS", "vs_5_0",
 		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
 		0,
-		&_vsBlob, &errorBlob);
+		_vsBlob.ReleaseAndGetAddressOf(), errorBlob.ReleaseAndGetAddressOf());
 
 	if (FAILED(result)) {
 		if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
@@ -288,7 +291,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		"BasicPS", "ps_5_0",
 		D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
 		0,
-		&_psBlob, &errorBlob);
+		_psBlob.ReleaseAndGetAddressOf(), errorBlob.ReleaseAndGetAddressOf());
 
 	if (FAILED(result)) {
 		if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
@@ -346,19 +349,19 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		&rootSigBlob,
 		&errorBlob);
 
-	ID3D12RootSignature* rootSignature = nullptr;
+	ComPtr<ID3D12RootSignature> rootSignature = nullptr;
 	result = _dev->CreateRootSignature(
 		0,
 		rootSigBlob->GetBufferPointer(),
 		rootSigBlob->GetBufferSize(),
-		IID_PPV_ARGS(&rootSignature));
+		IID_PPV_ARGS(rootSignature.ReleaseAndGetAddressOf()));
 	rootSigBlob->Release();
 
 	// パイプラインステート
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
-	pipelineStateDesc.pRootSignature = rootSignature;
-	pipelineStateDesc.VS = CD3DX12_SHADER_BYTECODE(_vsBlob);
-	pipelineStateDesc.PS = CD3DX12_SHADER_BYTECODE(_psBlob);
+	pipelineStateDesc.pRootSignature = rootSignature.Get();
+	pipelineStateDesc.VS = CD3DX12_SHADER_BYTECODE(_vsBlob.Get());
+	pipelineStateDesc.PS = CD3DX12_SHADER_BYTECODE(_psBlob.Get());
 	pipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
 	pipelineStateDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 	pipelineStateDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
@@ -380,8 +383,8 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	pipelineStateDesc.SampleDesc.Count = 1;
 	pipelineStateDesc.SampleDesc.Quality = 0;
 
-	ID3D12PipelineState* _pipelineState = nullptr;
-	result = _dev->CreateGraphicsPipelineState(&pipelineStateDesc, IID_PPV_ARGS(&_pipelineState));
+	ComPtr<ID3D12PipelineState> _pipelineState = nullptr;
+	result = _dev->CreateGraphicsPipelineState(&pipelineStateDesc, IID_PPV_ARGS(_pipelineState.ReleaseAndGetAddressOf()));
 
 	D3D12_VIEWPORT viewport = {};
 	viewport.Width = window_width;
@@ -415,7 +418,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		_cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
 			_backBuffers[bbIdx], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-		_cmdList->SetPipelineState(_pipelineState);
+		_cmdList->SetPipelineState(_pipelineState.Get());
 
 		auto rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
 		auto dsvH = dsvHeap->GetCPUDescriptorHandleForHeapStart();
@@ -433,8 +436,10 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		_cmdList->IASetVertexBuffers(0, 1, &mesh.GetVertexBufferView());
 		_cmdList->IASetIndexBuffer(&mesh.GetIndexBufferView());
 
-		_cmdList->SetGraphicsRootSignature(rootSignature);
-		_cmdList->SetDescriptorHeaps(1, &basicDescHeap);
+		_cmdList->SetGraphicsRootSignature(rootSignature.Get());
+
+		ID3D12DescriptorHeap* descHeaps[] = { basicDescHeap.Get() };
+		_cmdList->SetDescriptorHeaps(1, descHeaps);
 		_cmdList->SetGraphicsRootDescriptorTable(0, basicDescHeap->GetGPUDescriptorHandleForHeapStart());
 
 		ID3D12DescriptorHeap* materialDescHeap[] = { mesh.GetMaterialDescriptorHeap() };
@@ -464,9 +469,9 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 
 		_cmdList->Close();
 
-		ID3D12CommandList* cmdLists[] = { _cmdList };
+		ID3D12CommandList* cmdLists[] = { _cmdList.Get() };
 		_cmdQueue->ExecuteCommandLists(1, cmdLists);
-		_cmdQueue->Signal(_fence, ++_fenceVal);
+		_cmdQueue->Signal(_fence.Get(), ++_fenceVal);
 		if (_fence->GetCompletedValue() != _fenceVal) {
 			auto event = CreateEvent(nullptr, false, false, nullptr);
 			_fence->SetEventOnCompletion(_fenceVal, event);
@@ -475,7 +480,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		}
 
 		_cmdAllocator->Reset();
-		_cmdList->Reset(_cmdAllocator, nullptr);
+		_cmdList->Reset(_cmdAllocator.Get(), nullptr);
 
 		_swapchain->Present(1, 0);
 	}

@@ -59,7 +59,7 @@ std::wstring GetWString(const char* const rawString, size_t length)
 /**
  * 単一色のテクスチャーを生成
  */
-ID3D12Resource* CreateSingleColorTexture(ID3D12Device* const pD3D12Device, UINT8 r, UINT8 g, UINT8 b, UINT8 a)
+ID3D12Resource* CreateSingleColorTexture(Microsoft::WRL::ComPtr<ID3D12Device> pD3D12Device, UINT8 r, UINT8 g, UINT8 b, UINT8 a)
 {
 	auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_CPU_PAGE_PROPERTY_WRITE_BACK, D3D12_MEMORY_POOL_L0);
 	auto resDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, 4, 4);
@@ -88,7 +88,7 @@ ID3D12Resource* CreateSingleColorTexture(ID3D12Device* const pD3D12Device, UINT8
 	return pTextureResource;
 }
 
-ID3D12Resource* CreateGrayGradationTexture(ID3D12Device* const pD3D12Device)
+ID3D12Resource* CreateGrayGradationTexture(Microsoft::WRL::ComPtr<ID3D12Device> pD3D12Device)
 {
 	auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_CPU_PAGE_PROPERTY_WRITE_BACK, D3D12_MEMORY_POOL_L0);
 	auto resDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, 4, 256);

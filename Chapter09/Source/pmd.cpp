@@ -6,8 +6,9 @@
 #include <vector>
 
 // Windows
-#include <Windows.h>
 #include <tchar.h>
+#include <Windows.h>
+
 
 // DirectX
 #include <d3dx12.h>
@@ -18,6 +19,8 @@
 
 namespace pmd
 {
+	using namespace Microsoft::WRL;
+
 	// PMD頂点レイアウト
 	const std::vector<D3D12_INPUT_ELEMENT_DESC> PMDMesh::INPUT_LAYOUT = {
 		{ // 座標
@@ -76,7 +79,7 @@ namespace pmd
 	/**
 	 * PMDファイルからの読み込み
 	 */
-	HRESULT PMDMesh::LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename, const std::wstring& toonTexturePath)
+	HRESULT PMDMesh::LoadFromFile(ComPtr<ID3D12Device> pD3D12Device, const std::wstring& filename, const std::wstring& toonTexturePath)
 	{
 		HRESULT result;
 		FILE* fp = nullptr;
@@ -317,7 +320,7 @@ namespace pmd
 	/**
 	 * テクスチャーをファイルからロード
 	 */
-	ID3D12Resource* PMDMesh::LoadTextureFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename)
+	ID3D12Resource* PMDMesh::LoadTextureFromFile(ComPtr<ID3D12Device> pD3D12Device, const std::wstring& filename)
 	{
 		auto it = m_SharedResources.find(filename);
 		if (it != m_SharedResources.end()) {

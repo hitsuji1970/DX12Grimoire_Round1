@@ -3,6 +3,7 @@
 #include <d3d12.h>
 #include <DirectXMath.h>
 #include <Windows.h>
+#include <wrl.h>
 #include <string>
 #include <map>
 
@@ -97,7 +98,7 @@ namespace pmd
 		PMDMesh();
 		virtual ~PMDMesh();
 
-		HRESULT LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename, const std::wstring& toonTexturePath);
+		HRESULT LoadFromFile(Microsoft::WRL::ComPtr<ID3D12Device> pD3D12Device, const std::wstring& filename, const std::wstring& toonTexturePath);
 
 		unsigned int GetNumberOfVertex()
 		{
@@ -183,7 +184,7 @@ namespace pmd
 
 	private:
 		// テクスチャーをファイルからロード
-		ID3D12Resource* LoadTextureFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename);
+		ID3D12Resource* LoadTextureFromFile(Microsoft::WRL::ComPtr<ID3D12Device> pD3D12Device, const std::wstring& filename);
 
 		// リソースの破棄
 		void ClearResources();
