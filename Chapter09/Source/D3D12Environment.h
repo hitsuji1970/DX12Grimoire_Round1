@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <string>
 #include <vector>
@@ -13,31 +13,31 @@
 #pragma comment(lib, "DirectXTex.lib")
 
 /**
- * Direct3D12‚Ì•`‰æŠÂ‹«
+ * Direct3D12ã®æç”»ç’°å¢ƒ
  */
 class D3D12Environment
 {
 private:
-	/** Microsoft::WRL::ComPtr‚ÌŒ^–¼‚ğ’Zk */
+	/** Microsoft::WRL::ComPtrã®å‹åã‚’çŸ­ç¸® */
 	template<typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 public:
-	/** ƒRƒ“ƒXƒgƒ‰ƒNƒ^[ */
+	/** ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ãƒ¼ */
 	D3D12Environment();
 
-	/** ƒfƒXƒgƒ‰ƒNƒ^[ */
+	/** ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ãƒ¼ */
 	virtual ~D3D12Environment();
 
-	/** ‰Šú‰» */
+	/** åˆæœŸåŒ– */
 	HRESULT Initialize(HWND hWnd, UINT windowWidth, UINT windowHeight);
 
-	/** ƒRƒ}ƒ“ƒhƒŠƒXƒg‚Ì¶¬ */
+	/** ã‚³ãƒãƒ³ãƒ‰ãƒªã‚¹ãƒˆã®ç”Ÿæˆ */
 	HRESULT CreateCommandList(UINT nodeMask, D3D12_COMMAND_LIST_TYPE type, ID3D12PipelineState* pinitialState, REFIID riid, void** ppCommandList);
 
-	/** ƒRƒ}ƒ“ƒhƒŠƒXƒg‚ÌÀs */
+	/** ã‚³ãƒãƒ³ãƒ‰ãƒªã‚¹ãƒˆã®å®Ÿè¡Œ */
 	void ExecuteCommandLists(UINT numCommandLists, ID3D12CommandList* const* ppCommandLists);
 
-	/** DirectXƒCƒ“ƒ^[ƒtƒFƒCƒX‚Ìæ“¾ */
+	/** DirectXã‚¤ãƒ³ã‚¿ãƒ¼ãƒ•ã‚§ã‚¤ã‚¹ã®å–å¾— */
 	const ComPtr<ID3D12Device>& GetDevice() const
 	{
 		return _device;
@@ -69,39 +69,39 @@ public:
 	}
 
 private:
-	/** ƒfƒBƒXƒvƒŒƒCƒAƒ_ƒvƒ^[‚ÌƒCƒ“ƒ^[ƒtƒFƒCƒX */
+	/** ãƒ‡ã‚£ã‚¹ãƒ—ãƒ¬ã‚¤ã‚¢ãƒ€ãƒ—ã‚¿ãƒ¼ã®ã‚¤ãƒ³ã‚¿ãƒ¼ãƒ•ã‚§ã‚¤ã‚¹ */
 	ComPtr<IDXGIFactory6> _dxgiFactory;
 
-	/** DirectXƒfƒoƒCƒXƒCƒ“ƒ^[ƒtƒFƒCƒX */
+	/** DirectXãƒ‡ãƒã‚¤ã‚¹ã‚¤ãƒ³ã‚¿ãƒ¼ãƒ•ã‚§ã‚¤ã‚¹ */
 	ComPtr<ID3D12Device> _device;
 
-	/** ƒRƒ}ƒ“ƒhƒAƒƒP[ƒ^[: ƒRƒ}ƒ“ƒh‚ÌÀ‘Ì‚ğŠi”[‚·‚éƒƒ‚ƒŠ[‚ÌƒCƒ“ƒ^[ƒtƒFƒCƒX */
+	/** ã‚³ãƒãƒ³ãƒ‰ã‚¢ãƒ­ã‚±ãƒ¼ã‚¿ãƒ¼: ã‚³ãƒãƒ³ãƒ‰ã®å®Ÿä½“ã‚’æ ¼ç´ã™ã‚‹ãƒ¡ãƒ¢ãƒªãƒ¼ã®ã‚¤ãƒ³ã‚¿ãƒ¼ãƒ•ã‚§ã‚¤ã‚¹ */
 	ComPtr<ID3D12CommandAllocator> _cmdAllocator;
 
-	/** ƒRƒ}ƒ“ƒhƒLƒ…[ */
+	/** ã‚³ãƒãƒ³ãƒ‰ã‚­ãƒ¥ãƒ¼ */
 	ComPtr<ID3D12CommandQueue> _cmdQueue;
 
-	/** ƒŒƒ“ƒ_[ƒ^[ƒQƒbƒg */
+	/** ãƒ¬ãƒ³ãƒ€ãƒ¼ã‚¿ãƒ¼ã‚²ãƒƒãƒˆ */
 	ComPtr<IDXGISwapChain4> _swapChain;
 	ComPtr<ID3D12DescriptorHeap> _rtvHeaps = nullptr;
 	ComPtr<ID3D12DescriptorHeap> _dsvHeap = nullptr;
 	std::vector<ID3D12Resource*> _backBuffers;
 	ComPtr<ID3D12Resource> _depthBuffer = nullptr;
 
-	/** ƒtƒFƒ“ƒX */
+	/** ãƒ•ã‚§ãƒ³ã‚¹ */
 	ComPtr<ID3D12Fence> _fence;
 	UINT64 _fenceVal;
 
 private:
-	/** ƒXƒƒbƒvƒ`ƒFƒCƒ“‚ÆƒoƒbƒNƒoƒbƒtƒ@[‚Ì¶¬ */
+	/** ã‚¹ãƒ¯ãƒƒãƒ—ãƒã‚§ã‚¤ãƒ³ã¨ãƒãƒƒã‚¯ãƒãƒƒãƒ•ã‚¡ãƒ¼ã®ç”Ÿæˆ */
 	HRESULT CreateBackBuffers(HWND hWnd, UINT bufferWidth, UINT bufferHight);
 
-	/** [“xƒoƒbƒtƒ@[‚Ì¶¬ */
+	/** æ·±åº¦ãƒãƒƒãƒ•ã‚¡ãƒ¼ã®ç”Ÿæˆ */
 	HRESULT CreateDepthBuffer(UINT bufferWidth, UINT bufferHeight);
 
-	/** ƒfƒoƒbƒOƒŒƒCƒ„[‚Ì—LŒø‰» */
+	/** ãƒ‡ãƒãƒƒã‚°ãƒ¬ã‚¤ãƒ¤ãƒ¼ã®æœ‰åŠ¹åŒ– */
 	void EnableDebugLayer();
 
-	/** •¡”‚ÌƒOƒ‰ƒtƒBƒbƒNƒXƒJ[ƒh‚ğ“‹Ú‚·‚éƒVƒXƒeƒ€‚Å“Á’è‚ÌƒAƒ_ƒvƒ^[‚ğæ“¾ */
+	/** è¤‡æ•°ã®ã‚°ãƒ©ãƒ•ã‚£ãƒƒã‚¯ã‚¹ã‚«ãƒ¼ãƒ‰ã‚’æ­è¼‰ã™ã‚‹ã‚·ã‚¹ãƒ†ãƒ ã§ç‰¹å®šã®ã‚¢ãƒ€ãƒ—ã‚¿ãƒ¼ã‚’å–å¾— */
 	ComPtr<IDXGIAdapter> FindDXGIAdapter(const std::wstring& key);
 };

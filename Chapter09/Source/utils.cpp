@@ -119,3 +119,15 @@ ID3D12Resource* CreateGrayGradationTexture(Microsoft::WRL::ComPtr<ID3D12Device> 
 
 	return pTextureResource;
 }
+
+// デバッグ出力
+void DebugOutputFromString(const char* format, ...)
+{
+#ifdef _DEBUG
+	va_list valist;
+	va_start(valist, format);
+	std::vprintf(format, valist);
+	va_end(valist);
+#endif
+}
+

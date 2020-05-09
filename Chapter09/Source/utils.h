@@ -53,3 +53,8 @@ ID3D12Resource* CreateSingleColorTexture(Microsoft::WRL::ComPtr<ID3D12Device> pD
  * 白黒のグラデーションテクスチャーを生成
  */
 ID3D12Resource* CreateGrayGradationTexture(Microsoft::WRL::ComPtr<ID3D12Device> pD3D12Device);
+
+/**
+ * デバッグ出力
+ */
+void DebugOutputFromString(const char* format, ...);

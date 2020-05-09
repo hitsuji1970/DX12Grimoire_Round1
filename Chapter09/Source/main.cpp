@@ -9,7 +9,9 @@
 #include <wrl.h>
 #include <vector>
 
+#include "Application.h"
 #include "D3D12Environment.h"
+#include "utils.h"
 
 using namespace Microsoft::WRL;
 
@@ -27,11 +29,6 @@ const std::wstring ToonBmpPath = MMDDataPath + L"/Data";
 // 関数プロトタイプ
 HWND InitWindow(WNDCLASSEX* const pWndClass);
 LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
-void DebugOutputFromString(const char* format, ...);
-
-// 定数
-constexpr unsigned int window_width = 1280;
-constexpr unsigned int window_height = 720;
 
 // シェーダーに渡す行列
 struct SceneMatrix
@@ -52,15 +49,15 @@ int main()
 int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 #endif
 {
-	DebugOutputFromString("Show window test.");
-
-	WNDCLASSEX w = {};
-	HWND hWnd = InitWindow(&w);
+	DebugOutputFromString("toon shading test.");
 
 	HRESULT result = S_OK;
 
+	Application app;
 	D3D12Environment d3d12Env;
-	d3d12Env.Initialize(hWnd, window_width, window_height);
+
+	app.Initialize();
+	d3d12Env.Initialize(app.GetWindowHandle(), app.DefaultWindowWidth, app.DefaultWindowHeight);
 	auto pDevice = d3d12Env.GetDevice();
 	auto cmdAllocator = d3d12Env.GetCommandAllocator();
 
@@ -69,7 +66,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		return result;
 	}
 
-	ShowWindow(hWnd, SW_SHOW);
+	ShowWindow(app.GetWindowHandle(), SW_SHOW);
 
 	// 深度バッファー
 	// 定数バッファーに行列を設定
@@ -79,7 +76,8 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	DirectX::XMFLOAT3 up(0, 1, 0);
 
 	auto viewMatrix = DirectX::XMMatrixLookAtLH(DirectX::XMLoadFloat3(&eye), DirectX::XMLoadFloat3(&target), DirectX::XMLoadFloat3(&up));
-	auto projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV4, static_cast<float>(window_width) / static_cast<float>(window_height), 1.0f, 100.f);
+	auto aspectRatio = static_cast<float>(app.DefaultWindowWidth) / app.DefaultWindowHeight;
+	auto projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV4, aspectRatio, 1.0f, 100.f);
 
 	// 定数バッファー
 	ComPtr<ID3D12Resource> constBuff = nullptr;
@@ -249,8 +247,8 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	result = pDevice->CreateGraphicsPipelineState(&pipelineStateDesc, IID_PPV_ARGS(_pipelineState.ReleaseAndGetAddressOf()));
 
 	D3D12_VIEWPORT viewport = {};
-	viewport.Width = window_width;
-	viewport.Height = window_height;
+	viewport.Width = app.DefaultWindowWidth;
+	viewport.Height = app.DefaultWindowHeight;
 	viewport.TopLeftX = 0;
 	viewport.TopLeftY = 0;
 	viewport.MaxDepth = 1.0f;
@@ -259,8 +257,8 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	D3D12_RECT scissorRect = {};
 	scissorRect.top = 0;
 	scissorRect.left = 0;
-	scissorRect.right = scissorRect.left + window_width;
-	scissorRect.bottom = scissorRect.top + window_height;
+	scissorRect.right = scissorRect.left + app.DefaultWindowWidth;
+	scissorRect.bottom = scissorRect.top + app.DefaultWindowHeight;
 
 	MSG msg = {};
 	auto angle = 0.0f;
@@ -343,70 +341,8 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		swapChain->Present(1, 0);
 	}
 
-	UnregisterClass(w.lpszClassName, w.hInstance);
+	app.Terminate();
 
 	return 0;
-}
-
-HWND InitWindow(WNDCLASSEX* const pWndClass)
-{
-	DebugOutputFromString("Show window test.");
-	pWndClass->cbSize = sizeof(WNDCLASSEX);
-	pWndClass->lpfnWndProc = WNDPROC(WindowProcedure);
-	pWndClass->lpszClassName = TEXT("DX12Sample");
-	pWndClass->hInstance = GetModuleHandle(nullptr);
-
-	RegisterClassEx(pWndClass);
-
-	RECT wrc = { 0, 0, window_width, window_height };
-	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);
-
-	HWND hWnd = CreateWindow(pWndClass->lpszClassName,
-		TEXT("DX12テスト PMDモデル表示"),
-		WS_OVERLAPPEDWINDOW,
-		CW_USEDEFAULT,
-		CW_USEDEFAULT,
-		wrc.right - wrc.left,
-		wrc.bottom - wrc.top,
-		nullptr,
-		nullptr,
-		pWndClass->hInstance,
-		nullptr);
-
-	return hWnd;
-}
-
-LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-{
-	switch (msg)
-	{
-	case WM_DESTROY:
-		PostQuitMessage(0);
-		return 0;
-	case WM_KEYDOWN:
-		switch (wparam)
-		{
-		case VK_ESCAPE:
-			PostQuitMessage(0);
-			return 0;
-		default:
-			break;
-		}
-	default:
-		break;
-	}
-
-	return DefWindowProc(hwnd, msg, wparam, lparam);
-}
-
-// デバッグ出力
-void DebugOutputFromString(const char* format, ...)
-{
-#ifdef _DEBUG
-	va_list valist;
-	va_start(valist, format);
-	std::vprintf(format, valist);
-	va_end(valist);
-#endif
 }
 
