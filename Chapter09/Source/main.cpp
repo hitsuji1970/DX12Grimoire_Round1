@@ -9,6 +9,8 @@
 #include <wrl.h>
 #include <vector>
 
+#include "D3D12Environment.h"
+
 using namespace Microsoft::WRL;
 
 #ifdef _DEBUG
@@ -16,11 +18,6 @@ using namespace Microsoft::WRL;
 #endif
 
 #include "pmd.h"
-
-#pragma comment(lib, "d3d12.lib")
-#pragma comment(lib, "dxgi.lib")
-#pragma comment(lib, "d3dcompiler.lib")
-#pragma comment(lib, "DirectXTex.lib")
 
 // モデルデータ読み込みパス
 const std::wstring MMDDataPath = L"D:/MikuMikuDance_v932x64";
@@ -31,19 +28,10 @@ const std::wstring ToonBmpPath = MMDDataPath + L"/Data";
 HWND InitWindow(WNDCLASSEX* const pWndClass);
 LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 void DebugOutputFromString(const char* format, ...);
-void EnableDebugLayer();
 
 // 定数
 constexpr unsigned int window_width = 1280;
 constexpr unsigned int window_height = 720;
-
-// DirextXオブジェクト
-ComPtr<IDXGIFactory6> _dxgiFactory = nullptr;
-ComPtr<ID3D12Device> _dev = nullptr;
-ComPtr<ID3D12CommandAllocator> _cmdAllocator = nullptr;
-ComPtr<ID3D12GraphicsCommandList> _cmdList = nullptr;
-ComPtr<ID3D12CommandQueue> _cmdQueue = nullptr;
-ComPtr<IDXGISwapChain4> _swapchain = nullptr;
 
 // シェーダーに渡す行列
 struct SceneMatrix
@@ -54,6 +42,9 @@ struct SceneMatrix
 	DirectX::XMMATRIX viewProj;
 	DirectX::XMFLOAT3 eye;
 };
+
+/** コマンドリスト */
+ComPtr<ID3D12GraphicsCommandList> _cmdList;
 
 #ifdef _DEBUG
 int main()
@@ -66,150 +57,21 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	WNDCLASSEX w = {};
 	HWND hWnd = InitWindow(&w);
 
-	D3D_FEATURE_LEVEL levels[] = {
-		D3D_FEATURE_LEVEL_12_1,
-		D3D_FEATURE_LEVEL_12_0,
-		D3D_FEATURE_LEVEL_11_1,
-		D3D_FEATURE_LEVEL_11_0,
-	};
-
 	HRESULT result = S_OK;
 
-#ifdef _DEBUG
-	EnableDebugLayer();
-	if (FAILED(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(_dxgiFactory.ReleaseAndGetAddressOf())))) {
-		if (FAILED(CreateDXGIFactory2(0, IID_PPV_ARGS(_dxgiFactory.ReleaseAndGetAddressOf())))) {
-			return -1;
-		}
+	D3D12Environment d3d12Env;
+	d3d12Env.Initialize(hWnd, window_width, window_height);
+	auto pDevice = d3d12Env.GetDevice();
+	auto cmdAllocator = d3d12Env.GetCommandAllocator();
+
+	result = d3d12Env.CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,  nullptr, IID_PPV_ARGS(_cmdList.ReleaseAndGetAddressOf()));
+	if (FAILED(result)) {
+		return result;
 	}
-#else
-	if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(_dxgiFactory.ReleaseAndGetAddressOf())))) {
-		return -1;
-	}
-#endif // _DEBUG
-	std::vector<ComPtr<IDXGIAdapter>> adapters;
-	ComPtr<IDXGIAdapter> tmpAdapter = nullptr;
-	ComPtr<IDXGIAdapter> adapter = nullptr;
-	for (int i = 0; _dxgiFactory->EnumAdapters(i, &tmpAdapter) != DXGI_ERROR_NOT_FOUND; i++) {
-		adapters.push_back(tmpAdapter);
-	}
-	for (auto adpt : adapters) {
-		DXGI_ADAPTER_DESC adesc = {};
-		adpt->GetDesc(&adesc);
-		std::wstring strDesc = adesc.Description;
-		if (strDesc.find(L"NVIDIA") != std::string::npos) {
-			adapter = adpt;
-			break;
-		}
-	}
-
-	D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_1_0_CORE;
-	for (auto lv : levels) {
-		if (D3D12CreateDevice(adapter.Get(), lv, IID_PPV_ARGS(_dev.ReleaseAndGetAddressOf())) == S_OK) {
-			featureLevel = lv;
-			break;
-		}
-	}
-
-	if (!_dev) {
-		::MessageBox(hWnd, TEXT("Error"), TEXT("D3Dデバイスの初期化に失敗しました。"), MB_ICONERROR);
-		exit(-1);
-	}
-
-	// コマンドリスト
-	result = _dev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(_cmdAllocator.ReleaseAndGetAddressOf()));
-	result = _dev->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, _cmdAllocator.Get(), nullptr, IID_PPV_ARGS(_cmdList.ReleaseAndGetAddressOf()));
-
-	D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
-	cmdQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	cmdQueueDesc.NodeMask = 0;
-	cmdQueueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
-	cmdQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-	result = _dev->CreateCommandQueue(&cmdQueueDesc, IID_PPV_ARGS(_cmdQueue.ReleaseAndGetAddressOf()));
-
-	// スワップチェーン
-	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
-	swapChainDesc.Width = window_width;
-	swapChainDesc.Height = window_height;
-	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	swapChainDesc.Stereo = false;
-	swapChainDesc.SampleDesc.Count = 1;
-	swapChainDesc.SampleDesc.Quality = 0;
-	swapChainDesc.BufferUsage = DXGI_USAGE_BACK_BUFFER;
-	swapChainDesc.BufferCount = 2;
-	swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
-	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-	swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
-	swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-	result = _dxgiFactory->CreateSwapChainForHwnd(
-		_cmdQueue.Get(), hWnd, &swapChainDesc, nullptr, nullptr,
-		(IDXGISwapChain1**)_swapchain.ReleaseAndGetAddressOf());
-
-	// ディスクリプターヒープ
-	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
-	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-	heapDesc.NodeMask = 0;
-	heapDesc.NumDescriptors = 2;
-	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	ComPtr<ID3D12DescriptorHeap> rtvHeaps = nullptr;
-	result = _dev->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(rtvHeaps.ReleaseAndGetAddressOf()));
-
-	// スワップチェーンに関連付け
-	std::vector<ID3D12Resource*> _backBuffers(swapChainDesc.BufferCount);
-	D3D12_CPU_DESCRIPTOR_HANDLE cpuDescHandle = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
-	for (auto idx = 0u; idx < swapChainDesc.BufferCount; ++idx) {
-		result = _swapchain->GetBuffer(idx, IID_PPV_ARGS(&_backBuffers[idx]));
-		_dev->CreateRenderTargetView(_backBuffers[idx], nullptr, cpuDescHandle);
-		cpuDescHandle.ptr += _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	}
-
-	// フェンス
-	ComPtr<ID3D12Fence> _fence = nullptr;
-	UINT64 _fenceVal = 0;
-	result = _dev->CreateFence(_fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(_fence.ReleaseAndGetAddressOf()));
 
 	ShowWindow(hWnd, SW_SHOW);
 
 	// 深度バッファー
-	D3D12_RESOURCE_DESC depthResDesc = {};
-	depthResDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	depthResDesc.Width = window_width;
-	depthResDesc.Height = window_height;
-	depthResDesc.DepthOrArraySize = 1;
-	depthResDesc.Format = DXGI_FORMAT_D32_FLOAT;
-	depthResDesc.SampleDesc.Count = 1;
-	depthResDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-
-	// 深度値ヒーププロパティ
-	D3D12_HEAP_PROPERTIES depthHeapProp = {};
-	depthHeapProp.Type = D3D12_HEAP_TYPE_DEFAULT;
-	depthHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	depthHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
-
-	D3D12_CLEAR_VALUE depthClearValue = {};
-	depthClearValue.DepthStencil.Depth = 1.0f;
-	depthClearValue.Format = DXGI_FORMAT_D32_FLOAT;
-
-	ComPtr<ID3D12Resource> depthBuffer = nullptr;
-	result = _dev->CreateCommittedResource(
-		&depthHeapProp, D3D12_HEAP_FLAG_NONE,
-		&depthResDesc, D3D12_RESOURCE_STATE_DEPTH_WRITE,
-		&depthClearValue, IID_PPV_ARGS(depthBuffer.ReleaseAndGetAddressOf()));
-
-	// 深度バッファー用のディスクリプターヒープ
-	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-	dsvHeapDesc.NumDescriptors = 1;
-	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-	ComPtr<ID3D12DescriptorHeap> dsvHeap = nullptr;
-	result = _dev->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(dsvHeap.ReleaseAndGetAddressOf()));
-
-	// 深度ビュー
-	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-	dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
-	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-	dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
-	_dev->CreateDepthStencilView(depthBuffer.Get(), &dsvDesc, dsvHeap->GetCPUDescriptorHandleForHeapStart());
-
 	// 定数バッファーに行列を設定
 	auto worldMatrix = DirectX::XMMatrixRotationY(DirectX::XM_PIDIV4);
 	DirectX::XMFLOAT3 eye(0, 15, -15);
@@ -221,7 +83,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 
 	// 定数バッファー
 	ComPtr<ID3D12Resource> constBuff = nullptr;
-	result = _dev->CreateCommittedResource(
+	result = pDevice->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
 		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(SceneMatrix) + 0xff) & ~0xff),
@@ -242,19 +104,19 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	// CBV1つ
 	descHeapDesc.NumDescriptors = 1;
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	result = _dev->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(basicDescHeap.ReleaseAndGetAddressOf()));
+	result = pDevice->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(basicDescHeap.ReleaseAndGetAddressOf()));
 	auto basicHeapHandle = basicDescHeap->GetCPUDescriptorHandleForHeapStart();
 
 	// シェーダーリソースビュー（定数バッファー）
 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
 	cbvDesc.BufferLocation = constBuff->GetGPUVirtualAddress();
 	cbvDesc.SizeInBytes = static_cast<UINT>(constBuff->GetDesc().Width);
-	_dev->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
+	pDevice->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
 
 	pmd::PMDMesh mesh;
-	result = mesh.LoadFromFile(_dev, ModelPath + L"/初音ミク.pmd", ToonBmpPath);
-	//result = mesh.LoadFromFile(_dev, ModelPath + L"/初音ミクmetal.pmd");
-	//result = mesh.LoadFromFile(_dev, ModelPath + L"/巡音ルカ.pmd");
+	result = mesh.LoadFromFile(pDevice, ModelPath + L"/初音ミク.pmd", ToonBmpPath);
+	//result = mesh.LoadFromFile(_device, ModelPath + L"/初音ミクmetal.pmd");
+	//result = mesh.LoadFromFile(_device, ModelPath + L"/巡音ルカ.pmd");
 
 	// シェーダー
 	ComPtr<ID3DBlob> _vsBlob = nullptr;
@@ -350,7 +212,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		&errorBlob);
 
 	ComPtr<ID3D12RootSignature> rootSignature = nullptr;
-	result = _dev->CreateRootSignature(
+	result = pDevice->CreateRootSignature(
 		0,
 		rootSigBlob->GetBufferPointer(),
 		rootSigBlob->GetBufferSize(),
@@ -384,7 +246,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	pipelineStateDesc.SampleDesc.Quality = 0;
 
 	ComPtr<ID3D12PipelineState> _pipelineState = nullptr;
-	result = _dev->CreateGraphicsPipelineState(&pipelineStateDesc, IID_PPV_ARGS(_pipelineState.ReleaseAndGetAddressOf()));
+	result = pDevice->CreateGraphicsPipelineState(&pipelineStateDesc, IID_PPV_ARGS(_pipelineState.ReleaseAndGetAddressOf()));
 
 	D3D12_VIEWPORT viewport = {};
 	viewport.Width = window_width;
@@ -403,6 +265,10 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 	MSG msg = {};
 	auto angle = 0.0f;
 
+	auto swapChain = d3d12Env.GetSwapChain();
+	auto rtvHeaps = d3d12Env.GetRenderTargetViewHeaps();
+	auto dsvHeap = d3d12Env.GetDepthStencilViewHeap();
+
 	while (true) {
 		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
@@ -413,16 +279,17 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 			break;
 		}
 
-		auto bbIdx = _swapchain->GetCurrentBackBufferIndex();
+		auto bbIdx = swapChain->GetCurrentBackBufferIndex();
+		auto pBackBuffer = d3d12Env.GetBackBuffer(bbIdx);
 
 		_cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-			_backBuffers[bbIdx], D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+			pBackBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 		_cmdList->SetPipelineState(_pipelineState.Get());
 
 		auto rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
 		auto dsvH = dsvHeap->GetCPUDescriptorHandleForHeapStart();
-		rtvH.ptr += static_cast<size_t>(bbIdx) * _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		rtvH.ptr += static_cast<size_t>(bbIdx) * pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 		_cmdList->OMSetRenderTargets(1, &rtvH, true, &dsvH);
 
 		float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -446,7 +313,7 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		_cmdList->SetDescriptorHeaps(1, materialDescHeap);
 
 		auto materialH = materialDescHeap[0]->GetGPUDescriptorHandleForHeapStart();
-		auto cbvsrvIncSize = _dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		auto cbvsrvIncSize = pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		cbvsrvIncSize *= (1 + pmd::PMDMesh::NUMBER_OF_TEXTURE);
 		unsigned int idxOffset = 0;
 		for (auto& m : mesh.GetMaterials()) {
@@ -465,24 +332,15 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 		mapMatrix->eye = eye;
 
 		_cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-			_backBuffers[bbIdx], D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+			pBackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
 		_cmdList->Close();
 
 		ID3D12CommandList* cmdLists[] = { _cmdList.Get() };
-		_cmdQueue->ExecuteCommandLists(1, cmdLists);
-		_cmdQueue->Signal(_fence.Get(), ++_fenceVal);
-		if (_fence->GetCompletedValue() != _fenceVal) {
-			auto event = CreateEvent(nullptr, false, false, nullptr);
-			_fence->SetEventOnCompletion(_fenceVal, event);
-			WaitForSingleObject(event, INFINITE);
-			CloseHandle(event);
-		}
+		d3d12Env.ExecuteCommandLists(1, cmdLists);
+		_cmdList->Reset(cmdAllocator.Get(), nullptr);
 
-		_cmdAllocator->Reset();
-		_cmdList->Reset(_cmdAllocator.Get(), nullptr);
-
-		_swapchain->Present(1, 0);
+		swapChain->Present(1, 0);
 	}
 
 	UnregisterClass(w.lpszClassName, w.hInstance);
@@ -539,14 +397,6 @@ LRESULT WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	}
 
 	return DefWindowProc(hwnd, msg, wparam, lparam);
-}
-
-void EnableDebugLayer()
-{
-	ID3D12Debug* debugLayer = nullptr;
-	auto result = D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer));
-	debugLayer->EnableDebugLayer();
-	debugLayer->Release();
 }
 
 // デバッグ出力
