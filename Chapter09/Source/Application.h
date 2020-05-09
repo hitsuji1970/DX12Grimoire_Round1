@@ -1,8 +1,25 @@
 ﻿#pragma once
+
+#include <wrl.h>
 #include "D3D12Environment.h"
+#include "pmd.h"
+
+// シェーダーに渡す行列
+struct SceneMatrix
+{
+	DirectX::XMMATRIX world;
+	DirectX::XMMATRIX view;
+	DirectX::XMMATRIX proj;
+	DirectX::XMMATRIX viewProj;
+	DirectX::XMFLOAT3 eye;
+};
 
 class Application
 {
+private:
+	/** Microsoft::WRL::ComPtrの型名を短縮 */
+	template<typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
+
 public:
 	// 定数
 	static constexpr LONG DefaultWindowWidth = 1280;
@@ -14,6 +31,9 @@ public:
 
 	/** 初期化処理 */
 	HRESULT Initialize();
+
+	/** 実行と更新 */
+	void Run();
 
 	/** 終了処理 */
 	void Terminate();
@@ -30,6 +50,32 @@ private:
 
 	// ウィンドウクラス
 	WNDCLASSEX _wndClass;
+
+	// DirectX 12描画環境
+	D3D12Environment d3d12Env;
+
+	// コマンドリスト
+	ComPtr<ID3D12GraphicsCommandList> _cmdList;
+
+	// ルートシグネチャー
+	ComPtr<ID3D12RootSignature> _rootSignature;
+
+	// パイプラインステート
+	ComPtr<ID3D12PipelineState> _pipelineState;
+
+	ComPtr<ID3D12DescriptorHeap> _basicDescHeap;
+	ComPtr<ID3D12Resource> _constBuff;
+	SceneMatrix* _mappedMatrix;
+
+	// ビューポート
+	D3D12_VIEWPORT _viewport = {};
+
+	// シザー矩形
+	D3D12_RECT _scissorRect = {};
+
+	// PMDモデル
+	pmd::PMDMesh mesh;
+
 
 private:
 	// ウィンドウの初期化

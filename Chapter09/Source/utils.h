@@ -1,9 +1,15 @@
 ﻿#pragma once;
 
-#include <d3d12.h>
+// std
 #include <string>
 #include <vector>
+
+// Windows
+#include <tchar.h>
 #include <wrl.h>
+
+// DirectX
+#include <d3d12.h>
 
 /**
  * 文字列を指定の文字で分割
