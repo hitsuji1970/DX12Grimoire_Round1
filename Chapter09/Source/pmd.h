@@ -7,6 +7,8 @@
 #include <string>
 #include <map>
 
+#include "PMDMaterial.h"
+
 namespace pmd
 {
 	// PMDヘッダー構造体
@@ -25,62 +27,6 @@ namespace pmd
 		unsigned short boneNo[2];
 		unsigned char boneWeight;
 		unsigned char endflg;
-	};
-
-	// PMDマテリアル構造体
-#pragma pack(1)
-	struct SerializedMaterial
-	{
-		DirectX::XMFLOAT3 diffuse;
-		float alpha;
-		float specularity;
-		DirectX::XMFLOAT3 specular;
-		DirectX::XMFLOAT3 ambient;
-		unsigned char toonIdx;
-		unsigned char edgeFlg;
-		// パディング2bytesが入る
-		unsigned int indicesNum;
-		char texFilePath[20];
-	};
-#pragma pack()
-
-	struct BasicMatrial
-	{
-		DirectX::XMFLOAT3 diffuse;
-		float alpha;
-		DirectX::XMFLOAT3 specular;
-		float specularity;
-		DirectX::XMFLOAT3 ambient;
-	};
-
-	struct AdditionalMaterial
-	{
-		std::wstring texPath;
-		int toonIdx;
-		bool edgeFlg;
-	};
-
-	struct Material
-	{
-		unsigned int indicesNum;
-		BasicMatrial basicMaterial;
-		AdditionalMaterial additionalMaterial;
-		ID3D12Resource* pTextureResource;
-		ID3D12Resource* pSPHResource;
-		ID3D12Resource* pSPAResource;
-		ID3D12Resource* pToonResource;
-
-		Material() :
-			indicesNum(0), basicMaterial(), additionalMaterial(),
-			pTextureResource(nullptr), pSPHResource(nullptr), pSPAResource(nullptr),
-			pToonResource(nullptr)
-		{
-		}
-
-		~Material()
-		{
-			// テクスチャーリソースの解放はm_SharedResourcesの側で行う
-		}
 	};
 
 	class PMDMesh
@@ -122,10 +68,10 @@ namespace pmd
 
 		ID3D12DescriptorHeap* GetMaterialDescriptorHeap()
 		{
-			return m_pMaterialDescHeap;
+			return m_materialDescHeap.Get();
 		}
 
-		const std::vector<Material>& GetMaterials() const
+		const std::vector<PMDMaterial>& GetMaterials() const
 		{
 			return m_materials;
 		}
@@ -144,7 +90,7 @@ namespace pmd
 		unsigned int m_numberOfVertex;
 
 		// 頂点バッファー
-		ID3D12Resource* m_pVertexBuffer;
+		Microsoft::WRL::ComPtr<ID3D12Resource> m_vertexBuffer;
 
 		// 頂点バッファービュー
 		D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
@@ -153,7 +99,7 @@ namespace pmd
 		unsigned int m_numberOfIndex;
 
 		// インデックスバッファー
-		ID3D12Resource* m_pIndexBuffer;
+		Microsoft::WRL::ComPtr<ID3D12Resource> m_indexBuffer;
 
 		// インデックスバッファービュー
 		D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
@@ -162,32 +108,29 @@ namespace pmd
 		unsigned int m_numberOfMaterial;
 
 		// マテリアルバッファー
-		ID3D12Resource* m_pMaterialBuffer;
+		Microsoft::WRL::ComPtr<ID3D12Resource> m_materialBuffer;
 
 		// マテリアル用ディスクリプターヒープ
-		ID3D12DescriptorHeap* m_pMaterialDescHeap;
+		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_materialDescHeap;
 
 		// マテリアル実体
-		std::vector<Material> m_materials;
+		std::vector<PMDMaterial> m_materials;
 
 		// 白テクスチャー
-		ID3D12Resource* m_pWhiteTexture;
+		Microsoft::WRL::ComPtr<ID3D12Resource> m_whiteTexture;
 
 		// 黒テクスチャー
-		ID3D12Resource* m_pBlackTexture;
+		Microsoft::WRL::ComPtr<ID3D12Resource> m_blackTexture;
 
 		// 白黒のグラデーションテクスチャー
-		ID3D12Resource* m_pGradTexture;
+		Microsoft::WRL::ComPtr<ID3D12Resource> m_gradTexture;
 
 		// 共有リソース
-		std::map<std::wstring, ID3D12Resource*> m_SharedResources;
+		std::map<std::wstring, Microsoft::WRL::ComPtr<ID3D12Resource>> m_sharedResources;
 
 	private:
 		// テクスチャーをファイルからロード
 		ID3D12Resource* LoadTextureFromFile(Microsoft::WRL::ComPtr<ID3D12Device> pD3D12Device, const std::wstring& filename);
-
-		// リソースの破棄
-		void ClearResources();
 	};
 
 } // namespace pmd

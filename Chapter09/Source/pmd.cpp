@@ -60,11 +60,11 @@ namespace pmd
 	 */
 	PMDMesh::PMDMesh() :
 		m_signature{}, m_header(),
-		m_numberOfVertex(0), m_pVertexBuffer(nullptr), m_vertexBufferView{},
-		m_numberOfIndex(0), m_pIndexBuffer(nullptr), m_indexBufferView{},
-		m_numberOfMaterial(0), m_pMaterialBuffer(nullptr),
-		m_pMaterialDescHeap(nullptr), m_materials{},
-		m_pWhiteTexture(nullptr), m_pBlackTexture(nullptr)
+		m_numberOfVertex(0), m_vertexBuffer(nullptr), m_vertexBufferView{},
+		m_numberOfIndex(0), m_indexBuffer(nullptr), m_indexBufferView{},
+		m_numberOfMaterial(0), m_materialBuffer(nullptr),
+		m_materialDescHeap(nullptr), m_materials{},
+		m_whiteTexture(nullptr), m_blackTexture(nullptr)
 	{
 	}
 
@@ -73,7 +73,6 @@ namespace pmd
 	 */
 	PMDMesh::~PMDMesh()
 	{
-		ClearResources();
 	}
 
 	/**
@@ -107,26 +106,24 @@ namespace pmd
 		result = pD3D12Device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
 			&CD3DX12_RESOURCE_DESC::Buffer(rawVertices.size() * sizeof(rawVertices[0])), D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr, IID_PPV_ARGS(&m_pVertexBuffer)
+			nullptr, IID_PPV_ARGS(m_vertexBuffer.ReleaseAndGetAddressOf())
 		);
 		if (FAILED(result)) {
 			std::fclose(fp);
-			ClearResources();
 			return result;
 		}
 
 		unsigned char* mappedVertex = nullptr;
-		result = m_pVertexBuffer->Map(0, nullptr, (void**)&mappedVertex);
+		result = m_vertexBuffer->Map(0, nullptr, (void**)&mappedVertex);
 		if (FAILED(result)) {
 			std::fclose(fp);
-			ClearResources();
 			return result;
 		}
 		std::copy(std::begin(rawVertices), std::end(rawVertices), mappedVertex);
-		m_pVertexBuffer->Unmap(0, nullptr);
+		m_vertexBuffer->Unmap(0, nullptr);
 		mappedVertex = nullptr;
 
-		m_vertexBufferView.BufferLocation = m_pVertexBuffer->GetGPUVirtualAddress();
+		m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
 		m_vertexBufferView.SizeInBytes = static_cast<UINT>(rawVertices.size());
 		m_vertexBufferView.StrideInBytes = VERTEX_SIZE;
 
@@ -138,25 +135,23 @@ namespace pmd
 		result = pD3D12Device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
 			&CD3DX12_RESOURCE_DESC::Buffer(rawIndices.size() * sizeof(rawIndices[0])), D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr, IID_PPV_ARGS(&m_pIndexBuffer)
+			nullptr, IID_PPV_ARGS(m_indexBuffer.ReleaseAndGetAddressOf())
 		);
 		if (FAILED(result)) {
 			std::fclose(fp);
-			ClearResources();
 			return result;
 		}
 		unsigned short* mappedIndex = nullptr;
-		result = m_pIndexBuffer->Map(0, nullptr, (void**)&mappedIndex);
+		result = m_indexBuffer->Map(0, nullptr, (void**)&mappedIndex);
 		if (FAILED(result)) {
 			std::fclose(fp);
-			ClearResources();
 			return result;
 		}
 		std::copy(std::begin(rawIndices), std::end(rawIndices), mappedIndex);
-		m_pIndexBuffer->Unmap(0, nullptr);
+		m_indexBuffer->Unmap(0, nullptr);
 		mappedIndex = nullptr;
 
-		m_indexBufferView.BufferLocation = m_pIndexBuffer->GetGPUVirtualAddress();
+		m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
 		m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
 		m_indexBufferView.SizeInBytes = static_cast<UINT>(rawIndices.size() * sizeof(rawIndices[0]));
 
@@ -211,16 +206,15 @@ namespace pmd
 			D3D12_HEAP_FLAG_NONE,
 			&CD3DX12_RESOURCE_DESC::Buffer(materialBufferSize * m_numberOfMaterial),
 			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr, IID_PPV_ARGS(&m_pMaterialBuffer)
+			nullptr, IID_PPV_ARGS(m_materialBuffer.ReleaseAndGetAddressOf())
 		);
 		if (FAILED(result)) {
 			std::fclose(fp);
-			ClearResources();
 			return result;
 		}
 
 		unsigned char* pMappedMaterial = nullptr;
-		result = m_pMaterialBuffer->Map(0, nullptr, (void**)&pMappedMaterial);
+		result = m_materialBuffer->Map(0, nullptr, (void**)&pMappedMaterial);
 		for (auto& material : m_materials) {
 			*reinterpret_cast<BasicMatrial*>(pMappedMaterial) = material.basicMaterial;
 			pMappedMaterial += materialBufferSize;
@@ -231,15 +225,14 @@ namespace pmd
 		matDescHeapDesc.NodeMask = 0;
 		matDescHeapDesc.NumDescriptors = m_numberOfMaterial * (1 + NUMBER_OF_TEXTURE);
 		matDescHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		result = pD3D12Device->CreateDescriptorHeap(&matDescHeapDesc, IID_PPV_ARGS(&m_pMaterialDescHeap));
+		result = pD3D12Device->CreateDescriptorHeap(&matDescHeapDesc, IID_PPV_ARGS(m_materialDescHeap.ReleaseAndGetAddressOf()));
 		if (FAILED(result)) {
 			std::fclose(fp);
-			ClearResources();
 			return result;
 		}
 
 		D3D12_CONSTANT_BUFFER_VIEW_DESC matCBVDesc = {};
-		matCBVDesc.BufferLocation = m_pMaterialBuffer->GetGPUVirtualAddress();
+		matCBVDesc.BufferLocation = m_materialBuffer->GetGPUVirtualAddress();
 		matCBVDesc.SizeInBytes = static_cast<UINT>(materialBufferSize);
 
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -248,11 +241,11 @@ namespace pmd
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MipLevels = 1;
 
-		m_pWhiteTexture = CreateSingleColorTexture(pD3D12Device, 0xff, 0xff, 0xff, 0xff);
-		m_pBlackTexture = CreateSingleColorTexture(pD3D12Device, 0x00, 0x00, 0x00, 0xff);
-		m_pGradTexture = CreateGrayGradationTexture(pD3D12Device);
+		m_whiteTexture = CreateSingleColorTexture(pD3D12Device, 0xff, 0xff, 0xff, 0xff);
+		m_blackTexture = CreateSingleColorTexture(pD3D12Device, 0x00, 0x00, 0x00, 0xff);
+		m_gradTexture = CreateGrayGradationTexture(pD3D12Device);
 
-		auto matDescHeapH = m_pMaterialDescHeap->GetCPUDescriptorHandleForHeapStart();
+		auto matDescHeapH = m_materialDescHeap->GetCPUDescriptorHandleForHeapStart();
 		auto incSize = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		for (auto i = 0u; i < m_numberOfMaterial; i++) {
 			pD3D12Device->CreateConstantBufferView(&matCBVDesc, matDescHeapH);
@@ -263,12 +256,12 @@ namespace pmd
 			if (m_materials[i].pTextureResource)
 			{
 				srvDesc.Format = m_materials[i].pTextureResource->GetDesc().Format;
-				pD3D12Device->CreateShaderResourceView(m_materials[i].pTextureResource, &srvDesc, matDescHeapH);
+				pD3D12Device->CreateShaderResourceView(m_materials[i].pTextureResource.Get(), &srvDesc, matDescHeapH);
 			}
 			else
 			{
-				srvDesc.Format = m_pWhiteTexture->GetDesc().Format;
-				pD3D12Device->CreateShaderResourceView(m_pWhiteTexture, &srvDesc, matDescHeapH);
+				srvDesc.Format = m_whiteTexture->GetDesc().Format;
+				pD3D12Device->CreateShaderResourceView(m_whiteTexture.Get(), &srvDesc, matDescHeapH);
 			}
 			matDescHeapH.ptr += incSize;
 
@@ -276,12 +269,12 @@ namespace pmd
 			if (m_materials[i].pSPHResource)
 			{
 				srvDesc.Format = m_materials[i].pSPHResource->GetDesc().Format;
-				pD3D12Device->CreateShaderResourceView(m_materials[i].pSPHResource, &srvDesc, matDescHeapH);
+				pD3D12Device->CreateShaderResourceView(m_materials[i].pSPHResource.Get(), &srvDesc, matDescHeapH);
 			}
 			else
 			{
-				srvDesc.Format = m_pWhiteTexture->GetDesc().Format;
-				pD3D12Device->CreateShaderResourceView(m_pWhiteTexture, &srvDesc, matDescHeapH);
+				srvDesc.Format = m_whiteTexture->GetDesc().Format;
+				pD3D12Device->CreateShaderResourceView(m_whiteTexture.Get(), &srvDesc, matDescHeapH);
 			}
 			matDescHeapH.ptr += incSize;
 
@@ -289,12 +282,12 @@ namespace pmd
 			if (m_materials[i].pSPAResource)
 			{
 				srvDesc.Format = m_materials[i].pSPAResource->GetDesc().Format;
-				pD3D12Device->CreateShaderResourceView(m_materials[i].pSPAResource, &srvDesc, matDescHeapH);
+				pD3D12Device->CreateShaderResourceView(m_materials[i].pSPAResource.Get(), &srvDesc, matDescHeapH);
 			}
 			else
 			{
-				srvDesc.Format = m_pBlackTexture->GetDesc().Format;
-				pD3D12Device->CreateShaderResourceView(m_pBlackTexture, &srvDesc, matDescHeapH);
+				srvDesc.Format = m_blackTexture->GetDesc().Format;
+				pD3D12Device->CreateShaderResourceView(m_blackTexture.Get(), &srvDesc, matDescHeapH);
 			}
 			matDescHeapH.ptr += incSize;
 
@@ -302,12 +295,12 @@ namespace pmd
 			if (m_materials[i].pToonResource)
 			{
 				srvDesc.Format = m_materials[i].pToonResource->GetDesc().Format;
-				pD3D12Device->CreateShaderResourceView(m_materials[i].pToonResource, &srvDesc, matDescHeapH);
+				pD3D12Device->CreateShaderResourceView(m_materials[i].pToonResource.Get(), &srvDesc, matDescHeapH);
 			}
 			else
 			{
-				srvDesc.Format = m_pGradTexture->GetDesc().Format;
-				pD3D12Device->CreateShaderResourceView(m_pGradTexture, &srvDesc, matDescHeapH);
+				srvDesc.Format = m_gradTexture->GetDesc().Format;
+				pD3D12Device->CreateShaderResourceView(m_gradTexture.Get(), &srvDesc, matDescHeapH);
 			}
 			matDescHeapH.ptr += incSize;
 		}
@@ -322,9 +315,9 @@ namespace pmd
 	 */
 	ID3D12Resource* PMDMesh::LoadTextureFromFile(ComPtr<ID3D12Device> pD3D12Device, const std::wstring& filename)
 	{
-		auto it = m_SharedResources.find(filename);
-		if (it != m_SharedResources.end()) {
-			return it->second;
+		auto it = m_sharedResources.find(filename);
+		if (it != m_sharedResources.end()) {
+			return it->second.Get();
 		}
 
 		DirectX::TexMetadata metadata = {};
@@ -396,55 +389,9 @@ namespace pmd
 			return nullptr;
 		}
 
-		m_SharedResources.emplace(filename, pTextureResource);
+		m_sharedResources.emplace(filename, pTextureResource);
 
 		return pTextureResource;
 	}
 
-	/**
-	 * リソースの破棄
-	 */
-	void PMDMesh::ClearResources()
-	{
-		if (m_pVertexBuffer) {
-			m_pVertexBuffer->Release();
-			m_pVertexBuffer = nullptr;
-		}
-
-		if (m_pIndexBuffer) {
-			m_pIndexBuffer->Release();
-			m_pIndexBuffer = nullptr;
-		}
-
-		if (m_pMaterialBuffer) {
-			m_pMaterialBuffer->Release();
-			m_pMaterialBuffer = nullptr;
-		}
-
-		if (m_pMaterialDescHeap) {
-			m_pMaterialDescHeap->Release();
-			m_pMaterialDescHeap = nullptr;
-		}
-
-		if (m_pWhiteTexture) {
-			m_pWhiteTexture->Release();
-			m_pWhiteTexture = nullptr;
-		}
-
-		if (m_pBlackTexture) {
-			m_pBlackTexture->Release();
-			m_pBlackTexture = nullptr;
-		}
-		
-		if (m_pGradTexture) {
-			m_pGradTexture->Release();
-			m_pGradTexture = nullptr;
-		}
-
-		for (auto res : m_SharedResources)
-		{
-			res.second->Release();
-		}
-		m_SharedResources.clear();
-	}
 } // namespace pmd

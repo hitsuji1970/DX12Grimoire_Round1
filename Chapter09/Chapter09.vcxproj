@@ -150,12 +150,14 @@
     <ClCompile Include="Source\D3D12Environment.cpp" />
     <ClCompile Include="Source\main.cpp" />
     <ClCompile Include="Source\pmd.cpp" />
+    <ClCompile Include="Source\PMDMaterial.cpp" />
     <ClCompile Include="Source\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Application.h" />
     <ClInclude Include="Source\D3D12Environment.h" />
     <ClInclude Include="Source\pmd.h" />
+    <ClInclude Include="Source\PMDMaterial.h" />
     <ClInclude Include="Source\utils.h" />
   </ItemGroup>
   <ItemGroup>
