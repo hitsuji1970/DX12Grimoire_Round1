@@ -7,9 +7,11 @@
  *コンストラクター
  */
 D3D12Environment::D3D12Environment() :
-	_dxgiFactory(nullptr), _device(nullptr), _swapChain(nullptr),
-	_rtvHeaps(nullptr), _dsvHeap(nullptr), _backBuffers{}, _depthBuffer(nullptr),
-	_cmdAllocator(nullptr), _cmdQueue(nullptr), _fence(nullptr), _fenceVal(0)
+	_dxgiFactory(nullptr), _device(nullptr),
+	_cmdAllocator(nullptr), _cmdQueue(nullptr),
+	_swapChain(nullptr), _rtvHeaps(nullptr), _backBuffers{},
+	_dsvHeap(nullptr), _depthBuffer(nullptr),
+	_fence(nullptr), _fenceVal(0)
 {
 }
 
@@ -69,8 +71,6 @@ HRESULT D3D12Environment::Initialize(HWND hWnd, UINT windowWidth, UINT windowHei
 		return result;
 	}
 
-	// コマンドリスト
-
 	// コマンドキュー
 	D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
 	cmdQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
@@ -121,7 +121,7 @@ void D3D12Environment::ExecuteCommandLists(UINT numCommandLists, ID3D12CommandLi
 		WaitForSingleObject(event, INFINITE);
 		CloseHandle(event);
 	}
-	
+
 	_cmdAllocator->Reset();
 }
 

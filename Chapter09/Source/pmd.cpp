@@ -63,8 +63,7 @@ namespace pmd
 		m_numberOfVertex(0), m_vertexBuffer(nullptr), m_vertexBufferView{},
 		m_numberOfIndex(0), m_indexBuffer(nullptr), m_indexBufferView{},
 		m_numberOfMaterial(0), m_materialBuffer(nullptr),
-		m_materialDescHeap(nullptr), m_materials{},
-		m_whiteTexture(nullptr), m_blackTexture(nullptr)
+		m_materialDescHeap(nullptr), m_materials{}
 	{
 	}
 
@@ -157,49 +156,16 @@ namespace pmd
 
 		// マテリアルの読み込み
 		fread(&m_numberOfMaterial, sizeof(m_numberOfMaterial), 1, fp);
-		std::vector<SerializedMaterial> serializedMaterials(m_numberOfMaterial);
-		fread(serializedMaterials.data(), serializedMaterials.size() * sizeof(SerializedMaterial), 1, fp);
+		std::vector<SerializedMaterialData> serializedMaterials(m_numberOfMaterial);
+		fread(serializedMaterials.data(), serializedMaterials.size() * sizeof(SerializedMaterialData), 1, fp);
 
 		m_materials.resize(m_numberOfMaterial);
 		for (int i = 0; i < serializedMaterials.size(); i++) {
-			m_materials[i].indicesNum = serializedMaterials[i].indicesNum;
-			m_materials[i].basicMaterial.diffuse = serializedMaterials[i].diffuse;
-			m_materials[i].basicMaterial.alpha = serializedMaterials[i].alpha;
-			m_materials[i].basicMaterial.specular = serializedMaterials[i].specular;
-			m_materials[i].basicMaterial.specularity = serializedMaterials[i].specularity;
-			m_materials[i].basicMaterial.ambient = serializedMaterials[i].ambient;
-
-			m_materials[i].additionalMaterial.toonIdx = serializedMaterials[i].toonIdx;
-			m_materials[i].additionalMaterial.edgeFlg = serializedMaterials[i].edgeFlg;
-			auto len = std::strlen(serializedMaterials[i].texFilePath);
-			if (len > 0) {
-				std::wstring texPath = GetWString(serializedMaterials[i].texFilePath, len);
-				auto filenames = Split(texPath, L'*');
-				for (auto filename : filenames) {
-					auto path = folderPath + L'/' + filename;
-					auto ext = ::GetExtension(filename);
-					if (ext == L"sph") {
-						m_materials[i].pSPHResource = LoadTextureFromFile(pD3D12Device, path);
-					}
-					else if (ext == L"spa") {
-						m_materials[i].pSPAResource = LoadTextureFromFile(pD3D12Device, path);
-					}
-					else {
-						m_materials[i].pTextureResource = LoadTextureFromFile(pD3D12Device, path);
-					}
-#ifdef _DEBUG
-					wprintf(L"material[%d]: texture=\"%s\"\n", i, filename.c_str());
-#endif // _DEBUG
-				}
-			}
-
-			char toonFileName[16];
-			sprintf_s(toonFileName, "/toon%02d.bmp", serializedMaterials[i].toonIdx + 1);
-			//printf("toon idx: %d\n", serializedMaterials[i].toonIdx);
-			m_materials[i].pToonResource = LoadTextureFromFile(pD3D12Device, toonTexturePath + GetWString(toonFileName));
+			m_materials[i].LoadFromSerializedData(pD3D12Device, serializedMaterials[i], folderPath, toonTexturePath);
 		}
 
-		auto materialBufferSize = sizeof(BasicMatrial);
+		// マテリアルのバッファーを作成
+		auto materialBufferSize = sizeof(BasicMaterial);
 		materialBufferSize = (materialBufferSize + 0xff) & ~0xff;
 		result = pD3D12Device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
@@ -216,7 +182,7 @@ namespace pmd
 		unsigned char* pMappedMaterial = nullptr;
 		result = m_materialBuffer->Map(0, nullptr, (void**)&pMappedMaterial);
 		for (auto& material : m_materials) {
-			*reinterpret_cast<BasicMatrial*>(pMappedMaterial) = material.basicMaterial;
+			*reinterpret_cast<BasicMaterial*>(pMappedMaterial) = material.GetBasicMaterial();
 			pMappedMaterial += materialBufferSize;
 		}
 
@@ -241,157 +207,22 @@ namespace pmd
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MipLevels = 1;
 
-		m_whiteTexture = CreateSingleColorTexture(pD3D12Device, 0xff, 0xff, 0xff, 0xff);
-		m_blackTexture = CreateSingleColorTexture(pD3D12Device, 0x00, 0x00, 0x00, 0xff);
-		m_gradTexture = CreateGrayGradationTexture(pD3D12Device);
-
 		auto matDescHeapH = m_materialDescHeap->GetCPUDescriptorHandleForHeapStart();
 		auto incSize = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		for (auto i = 0u; i < m_numberOfMaterial; i++) {
 			pD3D12Device->CreateConstantBufferView(&matCBVDesc, matDescHeapH);
-			matDescHeapH.ptr += incSize;
-
-			// ディフューズ色テクスチャー
 			matCBVDesc.BufferLocation += materialBufferSize;
-			if (m_materials[i].pTextureResource)
-			{
-				srvDesc.Format = m_materials[i].pTextureResource->GetDesc().Format;
-				pD3D12Device->CreateShaderResourceView(m_materials[i].pTextureResource.Get(), &srvDesc, matDescHeapH);
-			}
-			else
-			{
-				srvDesc.Format = m_whiteTexture->GetDesc().Format;
-				pD3D12Device->CreateShaderResourceView(m_whiteTexture.Get(), &srvDesc, matDescHeapH);
-			}
 			matDescHeapH.ptr += incSize;
+			m_materials[i].CreateTextureBuffers(pD3D12Device, &srvDesc, &matDescHeapH, incSize);
 
-			// 乗算スフィアマップテクスチャー
-			if (m_materials[i].pSPHResource)
-			{
-				srvDesc.Format = m_materials[i].pSPHResource->GetDesc().Format;
-				pD3D12Device->CreateShaderResourceView(m_materials[i].pSPHResource.Get(), &srvDesc, matDescHeapH);
-			}
-			else
-			{
-				srvDesc.Format = m_whiteTexture->GetDesc().Format;
-				pD3D12Device->CreateShaderResourceView(m_whiteTexture.Get(), &srvDesc, matDescHeapH);
-			}
-			matDescHeapH.ptr += incSize;
-
-			// 加算スフィアマップテクスチャー
-			if (m_materials[i].pSPAResource)
-			{
-				srvDesc.Format = m_materials[i].pSPAResource->GetDesc().Format;
-				pD3D12Device->CreateShaderResourceView(m_materials[i].pSPAResource.Get(), &srvDesc, matDescHeapH);
-			}
-			else
-			{
-				srvDesc.Format = m_blackTexture->GetDesc().Format;
-				pD3D12Device->CreateShaderResourceView(m_blackTexture.Get(), &srvDesc, matDescHeapH);
-			}
-			matDescHeapH.ptr += incSize;
-
-			// トゥーンテクスチャー
-			if (m_materials[i].pToonResource)
-			{
-				srvDesc.Format = m_materials[i].pToonResource->GetDesc().Format;
-				pD3D12Device->CreateShaderResourceView(m_materials[i].pToonResource.Get(), &srvDesc, matDescHeapH);
-			}
-			else
-			{
-				srvDesc.Format = m_gradTexture->GetDesc().Format;
-				pD3D12Device->CreateShaderResourceView(m_gradTexture.Get(), &srvDesc, matDescHeapH);
-			}
-			matDescHeapH.ptr += incSize;
+#ifdef _DEBUG
+			wprintf(L"material[%d]; texture=\"%s\"\n", i, filename.c_str());
+#endif // _DEBUG
 		}
 
 		std::fclose(fp);
 		m_loadedModelPath = filename;
 		return S_OK;
-	}
-
-	/**
-	 * テクスチャーをファイルからロード
-	 */
-	ID3D12Resource* PMDMesh::LoadTextureFromFile(ComPtr<ID3D12Device> pD3D12Device, const std::wstring& filename)
-	{
-		auto it = m_sharedResources.find(filename);
-		if (it != m_sharedResources.end()) {
-			return it->second.Get();
-		}
-
-		DirectX::TexMetadata metadata = {};
-		DirectX::ScratchImage scratchImg = {};
-		HRESULT result;
-
-		// テクスチャー読み込み関数テーブル
-		using LoadLambda_t = std::function<HRESULT(const std::wstring& path, DirectX::TexMetadata*, DirectX::ScratchImage&)>;
-		std::map<std::wstring, LoadLambda_t> loadLambdaTable;
-		loadLambdaTable[L"sph"]
-			= loadLambdaTable[L"spa"]
-			= loadLambdaTable[L"bmp"]
-			= loadLambdaTable[L"png"]
-			= loadLambdaTable[L"jpg"]
-			= [](const std::wstring& path, DirectX::TexMetadata* meta, DirectX::ScratchImage& img)
-			-> HRESULT
-		{
-			return LoadFromWICFile(path.c_str(), DirectX::WIC_FLAGS_NONE, meta, img);
-		};
-
-		loadLambdaTable[L"tga"]
-			= [](const std::wstring& path, DirectX::TexMetadata* meta, DirectX::ScratchImage& img)
-			-> HRESULT
-		{
-			return LoadFromTGAFile(path.c_str(), meta, img);
-		};
-
-		loadLambdaTable[L"dds"]
-			= [](const std::wstring& path, DirectX::TexMetadata* meta, DirectX::ScratchImage& img)
-			-> HRESULT
-		{
-			return LoadFromDDSFile(path.c_str(), 0, meta, img);
-		};
-
-		// 読み込み
-		auto ext = GetExtension(filename);
-		result = loadLambdaTable[ext](filename, &metadata, scratchImg);
-		if (FAILED(result))
-		{
-			wprintf(L"load failed. : %s\n", filename.c_str());
-			return nullptr;
-		}
-
-		auto img = scratchImg.GetImage(0, 0, 0);
-		auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_CPU_PAGE_PROPERTY_WRITE_BACK, D3D12_MEMORY_POOL_L0);
-		auto resDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-			metadata.format, metadata.width, static_cast<UINT>(metadata.height),
-			static_cast<UINT16>(metadata.arraySize), static_cast<UINT16>(metadata.mipLevels));
-
-		ID3D12Resource* pTextureResource = nullptr;
-		result = pD3D12Device->CreateCommittedResource(
-			&heapProp, D3D12_HEAP_FLAG_NONE,
-			&resDesc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-			nullptr, IID_PPV_ARGS(&pTextureResource)
-		);
-
-		if (FAILED(result))
-		{
-			wprintf(L"failed to create resource : %s\n", filename.c_str());
-			return nullptr;
-		}
-
-		auto rowPitch = static_cast<UINT>(img->rowPitch);
-		auto slicePitch = static_cast<UINT>(img->slicePitch);
-		result = pTextureResource->WriteToSubresource(0, nullptr, img->pixels, rowPitch, slicePitch);
-		if (FAILED(result))
-		{
-			wprintf(L"failed to create resource : %s\n", filename.c_str());
-			return nullptr;
-		}
-
-		m_sharedResources.emplace(filename, pTextureResource);
-
-		return pTextureResource;
 	}
 
 } // namespace pmd

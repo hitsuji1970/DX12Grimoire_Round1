@@ -115,22 +115,6 @@ namespace pmd
 
 		// マテリアル実体
 		std::vector<PMDMaterial> m_materials;
-
-		// 白テクスチャー
-		Microsoft::WRL::ComPtr<ID3D12Resource> m_whiteTexture;
-
-		// 黒テクスチャー
-		Microsoft::WRL::ComPtr<ID3D12Resource> m_blackTexture;
-
-		// 白黒のグラデーションテクスチャー
-		Microsoft::WRL::ComPtr<ID3D12Resource> m_gradTexture;
-
-		// 共有リソース
-		std::map<std::wstring, Microsoft::WRL::ComPtr<ID3D12Resource>> m_sharedResources;
-
-	private:
-		// テクスチャーをファイルからロード
-		ID3D12Resource* LoadTextureFromFile(Microsoft::WRL::ComPtr<ID3D12Device> pD3D12Device, const std::wstring& filename);
 	};
 
 } // namespace pmd

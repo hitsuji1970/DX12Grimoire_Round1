@@ -32,7 +32,7 @@ public:
 	HRESULT Initialize(HWND hWnd, UINT windowWidth, UINT windowHeight);
 
 	/** コマンドリストの生成 */
-	HRESULT CreateCommandList(UINT nodeMask, D3D12_COMMAND_LIST_TYPE type, ID3D12PipelineState* pinitialState, REFIID riid, void** ppCommandList);
+	HRESULT CreateCommandList(UINT nodeMask, D3D12_COMMAND_LIST_TYPE type, ID3D12PipelineState* pInitialState, REFIID riid, void** ppCommandList);
 
 	/** コマンドリストの実行 */
 	void ExecuteCommandLists(UINT numCommandLists, ID3D12CommandList* const* ppCommandLists);
@@ -81,11 +81,13 @@ private:
 	/** コマンドキュー */
 	ComPtr<ID3D12CommandQueue> _cmdQueue;
 
-	/** レンダーターゲット */
+	/** フレームバッファー */
 	ComPtr<IDXGISwapChain4> _swapChain;
 	ComPtr<ID3D12DescriptorHeap> _rtvHeaps = nullptr;
-	ComPtr<ID3D12DescriptorHeap> _dsvHeap = nullptr;
 	std::vector<ID3D12Resource*> _backBuffers;
+
+	/** 深度バッファー */
+	ComPtr<ID3D12DescriptorHeap> _dsvHeap = nullptr;
 	ComPtr<ID3D12Resource> _depthBuffer = nullptr;
 
 	/** フェンス */

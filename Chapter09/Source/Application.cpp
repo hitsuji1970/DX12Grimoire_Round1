@@ -14,13 +14,14 @@
 // User
 #include "D3D12Environment.h"
 #include "utils.h"
+#include "PMDMaterial.h"
 
 // モデルデータ読み込みパス
 const std::wstring MMDDataPath = L"D:/MikuMikuDance_v932x64";
 const std::wstring ModelPath = MMDDataPath + L"/UserFile/Model";
 const std::wstring ToonBmpPath = MMDDataPath + L"/Data";
 
-Application::Application():
+Application::Application() :
 	_hWnd(nullptr), _cmdList(nullptr), _rootSignature(nullptr), _pipelineState(nullptr),
 	_basicDescHeap(nullptr),
 	_viewport{}, _scissorRect{}
@@ -46,7 +47,7 @@ HRESULT Application::Initialize()
 	d3d12Env.Initialize(_hWnd, DefaultWindowWidth, DefaultWindowHeight);
 	auto pDevice = d3d12Env.GetDevice();
 
-	result = d3d12Env.CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,  nullptr, IID_PPV_ARGS(_cmdList.ReleaseAndGetAddressOf()));
+	result = d3d12Env.CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, nullptr, IID_PPV_ARGS(_cmdList.ReleaseAndGetAddressOf()));
 	if (FAILED(result)) {
 		return result;
 	}
@@ -82,6 +83,7 @@ HRESULT Application::Initialize()
 	cbvDesc.SizeInBytes = static_cast<UINT>(_constBuff->GetDesc().Width);
 	pDevice->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
 
+	result = pmd::PMDMaterial::LoadDefaultTextures(pDevice);
 	result = mesh.LoadFromFile(pDevice, ModelPath + L"/初音ミク.pmd", ToonBmpPath);
 	//result = mesh.LoadFromFile(_device, ModelPath + L"/初音ミクmetal.pmd");
 	//result = mesh.LoadFromFile(_device, ModelPath + L"/巡音ルカ.pmd");
@@ -240,19 +242,24 @@ void Application::Run()
 
 	auto pDevice = d3d12Env.GetDevice();
 	auto swapChain = d3d12Env.GetSwapChain();
+	auto cmdAllocator = d3d12Env.GetCommandAllocator();
 	auto rtvHeaps = d3d12Env.GetRenderTargetViewHeaps();
 	auto dsvHeap = d3d12Env.GetDepthStencilViewHeap();
-	auto cmdAllocator = d3d12Env.GetCommandAllocator();
 
 	// 定数バッファーに行列を設定
 	DirectX::XMFLOAT3 eye(0, 15, -15);
 	DirectX::XMFLOAT3 target(0, 15, 0);
 	DirectX::XMFLOAT3 up(0, 1, 0);
-
 	DirectX::XMMATRIX worldMatrix;
+
 	auto viewMatrix = DirectX::XMMatrixLookAtLH(DirectX::XMLoadFloat3(&eye), DirectX::XMLoadFloat3(&target), DirectX::XMLoadFloat3(&up));
 	auto aspectRatio = static_cast<float>(DefaultWindowWidth) / DefaultWindowHeight;
 	auto projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV4, aspectRatio, 1.0f, 100.f);
+
+	_mappedMatrix->view = viewMatrix;
+	_mappedMatrix->proj = projectionMatrix;
+	_mappedMatrix->viewProj = viewMatrix * projectionMatrix;
+	_mappedMatrix->eye = eye;
 
 	while (true) {
 		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
@@ -301,20 +308,16 @@ void Application::Run()
 		auto cbvsrvIncSize = pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		cbvsrvIncSize *= (1 + pmd::PMDMesh::NUMBER_OF_TEXTURE);
 		unsigned int idxOffset = 0;
-		for (auto& m : mesh.GetMaterials()) {
+		for (auto& material : mesh.GetMaterials()) {
 			_cmdList->SetGraphicsRootDescriptorTable(1, materialH);
-			_cmdList->DrawIndexedInstanced(m.indicesNum, 1, idxOffset, 0, 0);
+			_cmdList->DrawIndexedInstanced(material.GetIndicesNum(), 1, idxOffset, 0, 0);
 			materialH.ptr += cbvsrvIncSize;
-			idxOffset += m.indicesNum;
+			idxOffset += material.GetIndicesNum();
 		}
 
 		angle += 0.01f;
 		worldMatrix = DirectX::XMMatrixRotationY(angle);
 		_mappedMatrix->world = worldMatrix;
-		_mappedMatrix->view = viewMatrix;
-		_mappedMatrix->proj = projectionMatrix;
-		_mappedMatrix->viewProj = viewMatrix * projectionMatrix;
-		_mappedMatrix->eye = eye;
 
 		_cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
 			pBackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
