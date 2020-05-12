@@ -1,4 +1,6 @@
-﻿// std
+﻿#include "PMDActor.h"
+
+// std
 #include <algorithm>
 #include <iostream>
 #include <functional>
@@ -9,12 +11,10 @@
 #include <tchar.h>
 #include <Windows.h>
 
-
 // DirectX
 #include <d3dx12.h>
 #include <DirectXTex.h>
 
-#include "pmd.h"
 #include "utils.h"
 
 namespace pmd
@@ -22,7 +22,7 @@ namespace pmd
 	using namespace Microsoft::WRL;
 
 	// PMD頂点レイアウト
-	const std::vector<D3D12_INPUT_ELEMENT_DESC> PMDMesh::InputLayout = {
+	const std::vector<D3D12_INPUT_ELEMENT_DESC> PMDActor::InputLayout = {
 		{ // 座標
 			"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
 			D3D12_APPEND_ALIGNED_ELEMENT,
@@ -58,7 +58,7 @@ namespace pmd
 	/**
 	 * コンストラクター
 	 */
-	PMDMesh::PMDMesh() :
+	PMDActor::PMDActor() :
 		m_signature{}, m_header(),
 		m_numberOfVertex(0), m_vertexBuffer(nullptr), m_vertexBufferView{},
 		m_numberOfIndex(0), m_indexBuffer(nullptr), m_indexBufferView{},
@@ -70,14 +70,14 @@ namespace pmd
 	/**
 	 * デストラクター
 	 */
-	PMDMesh::~PMDMesh()
+	PMDActor::~PMDActor()
 	{
 	}
 
 	/**
 	 * PMDファイルからの読み込み
 	 */
-	HRESULT PMDMesh::LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename, const std::wstring& toonTexturePath)
+	HRESULT PMDActor::LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename, const std::wstring& toonTexturePath)
 	{
 		HRESULT result;
 		FILE* fp = nullptr;

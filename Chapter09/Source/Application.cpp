@@ -144,7 +144,7 @@ Application::Run()
 
 		auto materialH = materialDescHeap[0]->GetGPUDescriptorHandleForHeapStart();
 		auto cbvsrvIncSize = pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		cbvsrvIncSize *= (1 + pmd::PMDMesh::NUMBER_OF_TEXTURE);
+		cbvsrvIncSize *= (1 + pmd::PMDActor::NUMBER_OF_TEXTURE);
 		unsigned int idxOffset = 0;
 		for (auto& material : mesh.GetMaterials()) {
 			commandList->SetGraphicsRootDescriptorTable(1, materialH);

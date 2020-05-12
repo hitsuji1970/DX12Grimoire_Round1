@@ -4,7 +4,7 @@
 #include <wrl.h>
 
 #include "D3D12Environment.h"
-#include "pmd.h"
+#include "PMDActor.h"
 #include "PMDRenderer.h"
 
 // シェーダーに渡す行列
@@ -66,7 +66,7 @@ private:
 
 
 	// PMDモデル
-	pmd::PMDMesh mesh;
+	pmd::PMDActor mesh;
 
 
 private:

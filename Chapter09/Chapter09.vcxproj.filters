@@ -13,9 +13,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source\pmd.cpp">
-      <Filter>PMD</Filter>
-    </ClCompile>
     <ClCompile Include="Source\PMDMaterial.cpp">
       <Filter>PMD</Filter>
     </ClCompile>
@@ -26,11 +23,11 @@
     <ClCompile Include="Source\PMDRenderer.cpp">
       <Filter>PMD</Filter>
     </ClCompile>
+    <ClCompile Include="Source\PMDActor.cpp">
+      <Filter>PMD</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\pmd.h">
-      <Filter>PMD</Filter>
-    </ClInclude>
     <ClInclude Include="Source\PMDMaterial.h">
       <Filter>PMD</Filter>
     </ClInclude>
@@ -38,6 +35,9 @@
     <ClInclude Include="Source\D3D12Environment.h" />
     <ClInclude Include="Source\utils.h" />
     <ClInclude Include="Source\PMDRenderer.h">
+      <Filter>PMD</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\PMDActor.h">
       <Filter>PMD</Filter>
     </ClInclude>
   </ItemGroup>

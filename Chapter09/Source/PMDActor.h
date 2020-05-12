@@ -1,11 +1,17 @@
 ﻿#pragma once;
 
-#include <d3d12.h>
-#include <DirectXMath.h>
+// std
+#include <map>
+#include <string>
+#include <vector>
+
+// Windows
 #include <Windows.h>
 #include <wrl.h>
-#include <string>
-#include <map>
+
+// DirectX
+#include <d3d12.h>
+#include <DirectXMath.h>
 
 #include "PMDMaterial.h"
 
@@ -29,7 +35,7 @@ namespace pmd
 		unsigned char endflg;
 	};
 
-	class PMDMesh
+	class PMDActor
 	{
 	public:
 		// 頂点データのサイズ
@@ -41,8 +47,8 @@ namespace pmd
 		// シェーダーリソース用テクスチャーの数
 		static constexpr size_t NUMBER_OF_TEXTURE = 4;
 
-		PMDMesh();
-		virtual ~PMDMesh();
+		PMDActor();
+		virtual ~PMDActor();
 
 		HRESULT LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename, const std::wstring& toonTexturePath);
 
