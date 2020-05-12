@@ -80,9 +80,7 @@ HRESULT Application::Initialize()
 	cbvDesc.SizeInBytes = static_cast<UINT>(_constBuff->GetDesc().Width);
 	pDevice->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
 
-	_pmdRenderer.reset(new pmd::PMDRenderer());
-	_pmdRenderer->CreateRootSignature(d3d12Env->GetDevice().Get());
-	_pmdRenderer->CreateGraphicsPiplieState(d3d12Env->GetDevice().Get());
+	_pmdRenderer.reset(new pmd::PMDRenderer(d3d12Env->GetDevice().Get()));
 
 	result = pmd::PMDMaterial::LoadDefaultTextures(pDevice.Get());
 	result = mesh.LoadFromFile(pDevice.Get(), ModelPath + L"/初音ミク.pmd", ToonBmpPath);

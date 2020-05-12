@@ -36,7 +36,7 @@ namespace pmd
 		static constexpr size_t VERTEX_SIZE = 38;
 
 		// 頂点レイアウト
-		static const std::vector<D3D12_INPUT_ELEMENT_DESC> INPUT_LAYOUT;
+		static const std::vector<D3D12_INPUT_ELEMENT_DESC> InputLayout;
 
 		// シェーダーリソース用テクスチャーの数
 		static constexpr size_t NUMBER_OF_TEXTURE = 4;

@@ -22,7 +22,7 @@ namespace pmd
 	using namespace Microsoft::WRL;
 
 	// PMD頂点レイアウト
-	const std::vector<D3D12_INPUT_ELEMENT_DESC> PMDMesh::INPUT_LAYOUT = {
+	const std::vector<D3D12_INPUT_ELEMENT_DESC> PMDMesh::InputLayout = {
 		{ // 座標
 			"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
 			D3D12_APPEND_ALIGNED_ELEMENT,

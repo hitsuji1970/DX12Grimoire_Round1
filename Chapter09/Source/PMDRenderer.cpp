@@ -8,7 +8,7 @@ namespace pmd
 	template<typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 	// PMD頂点レイアウト
-	const D3D12_INPUT_ELEMENT_DESC INPUT_LAYOUT[] = {
+	const D3D12_INPUT_ELEMENT_DESC PMDRenderer::InputLayout[] = {
 		{ // 座標
 			"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
 			D3D12_APPEND_ALIGNED_ELEMENT,
@@ -42,9 +42,11 @@ namespace pmd
 	};
 
 	// コンストラクター
-	PMDRenderer::PMDRenderer() :
+	PMDRenderer::PMDRenderer(ID3D12Device* pD3D12Device) :
 		_rootSignature(nullptr), _pipelineState(nullptr)
 	{
+		CreateRootSignature(pD3D12Device);
+		CreateGraphicsPiplieState(pD3D12Device);
 	}
 
 	// デストラクター
@@ -59,56 +61,17 @@ namespace pmd
 
 		// シェーダー
 		ComPtr<ID3DBlob> _vsBlob = nullptr;
+		result = CompileShaderFromFile(L"Source/BasicVertexShader.hlsl", "BasicVS", "vs_5_0", _vsBlob.ReleaseAndGetAddressOf());
+		if (FAILED(result)) {
+			return result;
+		}
+
 		ComPtr<ID3DBlob> _psBlob = nullptr;
-		ComPtr<ID3DBlob> errorBlob = nullptr;
-
-		result = D3DCompileFromFile(
-			L"Source/BasicVertexShader.hlsl",
-			nullptr,
-			D3D_COMPILE_STANDARD_FILE_INCLUDE,
-			"BasicVS", "vs_5_0",
-			D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
-			0,
-			_vsBlob.ReleaseAndGetAddressOf(), errorBlob.ReleaseAndGetAddressOf());
-
+		result = CompileShaderFromFile(L"Source/BasicPixelShader.hlsl", "BasicPS", "ps_5_0", _psBlob.ReleaseAndGetAddressOf());
 		if (FAILED(result)) {
-			if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
-				::OutputDebugStringA("ファイルが見つかりません");
-				return 0;
-			}
-			else {
-				std::string errStr;
-				errStr.resize(errorBlob->GetBufferSize());
-				std::copy_n((char*)errorBlob->GetBufferPointer(), errorBlob->GetBufferSize(), errStr.begin());
-				errStr += "\n";
-				::OutputDebugStringA(errStr.c_str());
-			}
+			return result;
 		}
 
-		result = D3DCompileFromFile(
-			L"Source/BasicPixelShader.hlsl",
-			nullptr,
-			D3D_COMPILE_STANDARD_FILE_INCLUDE,
-			"BasicPS", "ps_5_0",
-			D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
-			0,
-			_psBlob.ReleaseAndGetAddressOf(), errorBlob.ReleaseAndGetAddressOf());
-
-		if (FAILED(result)) {
-			if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
-				::OutputDebugStringA("ファイルが見つかりません");
-				return 0;
-			}
-			else {
-				std::string errStr;
-				errStr.resize(errorBlob->GetBufferSize());
-				std::copy_n((char*)errorBlob->GetBufferPointer(), errorBlob->GetBufferSize(), errStr.begin());
-				errStr += "\n";
-				::OutputDebugStringA(errStr.c_str());
-			}
-		}
-
-		// パイプラインステート
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
 		pipelineStateDesc.pRootSignature = _rootSignature.Get();
 		pipelineStateDesc.VS = CD3DX12_SHADER_BYTECODE(_vsBlob.Get());
@@ -125,8 +88,8 @@ namespace pmd
 		renderTargetBlendDesc.LogicOpEnable = false;
 		renderTargetBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 		pipelineStateDesc.BlendState.RenderTarget[0] = renderTargetBlendDesc;
-		pipelineStateDesc.InputLayout.pInputElementDescs = INPUT_LAYOUT;
-		pipelineStateDesc.InputLayout.NumElements = static_cast<UINT>(sizeof(INPUT_LAYOUT) / sizeof(INPUT_LAYOUT[0]));
+		pipelineStateDesc.InputLayout.pInputElementDescs = InputLayout;
+		pipelineStateDesc.InputLayout.NumElements = static_cast<UINT>(sizeof(InputLayout) / sizeof(InputLayout[0]));
 		pipelineStateDesc.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
 		pipelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		pipelineStateDesc.NumRenderTargets = 1;
@@ -139,7 +102,7 @@ namespace pmd
 		{
 			return result;
 		}
-		_pipelineState->SetName(L"PipelineState");
+		_pipelineState->SetName(L"PMDPipelineState");
 
 		return S_OK;
 	}
@@ -196,7 +159,33 @@ namespace pmd
 		if (FAILED(result)) {
 			return result;
 		}
+		_rootSignature->SetName(L"PMDRootSignature");
 
 		return S_OK;
+	}
+
+	HRESULT PMDRenderer::CompileShaderFromFile(LPCWSTR pFileName, LPCSTR pEntrypoint, LPCSTR pShaderModel, ID3DBlob** ppByteCode)
+	{
+		ComPtr<ID3DBlob> errorBlob = nullptr;
+
+		auto result = D3DCompileFromFile(
+			pFileName, nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+			pEntrypoint, pShaderModel,
+			D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION, 0,
+			ppByteCode, errorBlob.ReleaseAndGetAddressOf());
+
+		if (FAILED(result)) {
+			if (result == HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND)) {
+				::OutputDebugStringA("ファイルが見つかりません");
+			}
+			else {
+				std::string errStr;
+				errStr.resize(errorBlob->GetBufferSize());
+				std::copy_n((char*)errorBlob->GetBufferPointer(), errorBlob->GetBufferSize(), errStr.begin());
+				errStr += "\n";
+				::OutputDebugStringA(errStr.c_str());
+			}
+			return result;
+		}
 	}
 }
