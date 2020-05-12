@@ -59,7 +59,7 @@ namespace pmd
 	PMDActor::PMDActor() :
 		m_signature{}, m_header(),
 		m_vertexBuffer(nullptr), m_vertexBufferView{},
-		m_numberOfIndex(0), m_indexBuffer(nullptr), m_indexBufferView{},
+		m_indexBuffer(nullptr), m_indexBufferView{},
 		m_numberOfMaterial(0), m_materialBuffer(nullptr),
 		m_materialDescHeap(nullptr), m_materials{}
 	{
@@ -97,7 +97,6 @@ namespace pmd
 		std::fread(&numberOfVertex, sizeof(numberOfVertex), 1, fp);
 		rawVertices.resize(numberOfVertex * VERTEX_SIZE);
 		std::fread(rawVertices.data(), rawVertices.size(), 1, fp);
-
 		result = CreateVertexBuffer(pD3D12Device, rawVertices);
 		if (FAILED(result))
 		{
@@ -106,37 +105,23 @@ namespace pmd
 		}
 
 		// インデックスデータの読み込みとインデックスバッファーの生成
+		unsigned int numberOfIndex;
 		std::vector<unsigned short> rawIndices;
-		std::fread(&m_numberOfIndex, sizeof(m_numberOfIndex), 1, fp);
-		rawIndices.resize(m_numberOfIndex);
+		std::fread(&numberOfIndex, sizeof(numberOfIndex), 1, fp);
+		rawIndices.resize(numberOfIndex);
 		fread(rawIndices.data(), rawIndices.size() * sizeof(rawIndices[0]), 1, fp);
-		result = pD3D12Device->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(rawIndices.size() * sizeof(rawIndices[0])), D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr, IID_PPV_ARGS(m_indexBuffer.ReleaseAndGetAddressOf())
-		);
-		if (FAILED(result)) {
+		result = CreateIndexBuffer(pD3D12Device, rawIndices);
+		if (FAILED(result))
+		{
 			std::fclose(fp);
 			return result;
 		}
-		unsigned short* mappedIndex = nullptr;
-		result = m_indexBuffer->Map(0, nullptr, (void**)&mappedIndex);
-		if (FAILED(result)) {
-			std::fclose(fp);
-			return result;
-		}
-		std::copy(std::begin(rawIndices), std::end(rawIndices), mappedIndex);
-		m_indexBuffer->Unmap(0, nullptr);
-		mappedIndex = nullptr;
-
-		m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
-		m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
-		m_indexBufferView.SizeInBytes = static_cast<UINT>(rawIndices.size() * sizeof(rawIndices[0]));
 
 		// マテリアルの読み込み
 		fread(&m_numberOfMaterial, sizeof(m_numberOfMaterial), 1, fp);
 		std::vector<SerializedMaterialData> serializedMaterials(m_numberOfMaterial);
 		fread(serializedMaterials.data(), serializedMaterials.size() * sizeof(SerializedMaterialData), 1, fp);
+		std::fclose(fp);
 
 		m_materials.resize(m_numberOfMaterial);
 		for (int i = 0; i < serializedMaterials.size(); i++) {
@@ -157,7 +142,6 @@ namespace pmd
 			nullptr, IID_PPV_ARGS(m_materialBuffer.ReleaseAndGetAddressOf())
 		);
 		if (FAILED(result)) {
-			std::fclose(fp);
 			return result;
 		}
 
@@ -175,7 +159,6 @@ namespace pmd
 		matDescHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		result = pD3D12Device->CreateDescriptorHeap(&matDescHeapDesc, IID_PPV_ARGS(m_materialDescHeap.ReleaseAndGetAddressOf()));
 		if (FAILED(result)) {
-			std::fclose(fp);
 			return result;
 		}
 
@@ -198,7 +181,6 @@ namespace pmd
 			m_materials[i].CreateTextureBuffers(pD3D12Device, &srvDesc, &matDescHeapH, incSize);
 		}
 
-		std::fclose(fp);
 		m_loadedModelPath = filename;
 		return S_OK;
 	}
@@ -253,6 +235,34 @@ namespace pmd
 		m_vertexBufferView.StrideInBytes = VERTEX_SIZE;
 
 		return S_OK;
+	}
+
+	// インデックスバッファーの作成
+	HRESULT PMDActor::CreateIndexBuffer(ID3D12Device* const pD3D12Device, const std::vector<unsigned short>& rawIndices)
+	{
+		HRESULT result;
+
+		result = pD3D12Device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(rawIndices.size() * sizeof(rawIndices[0])), D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr, IID_PPV_ARGS(m_indexBuffer.ReleaseAndGetAddressOf())
+		);
+		if (FAILED(result)) {
+			return result;
+		}
+
+		unsigned short* mappedIndex = nullptr;
+		result = m_indexBuffer->Map(0, nullptr, (void**)&mappedIndex);
+		if (FAILED(result)) {
+			return result;
+		}
+		std::copy(std::begin(rawIndices), std::end(rawIndices), mappedIndex);
+		m_indexBuffer->Unmap(0, nullptr);
+		mappedIndex = nullptr;
+
+		m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+		m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
+		m_indexBufferView.SizeInBytes = static_cast<UINT>(rawIndices.size() * sizeof(rawIndices[0]));
 	}
 
 } // namespace pmd

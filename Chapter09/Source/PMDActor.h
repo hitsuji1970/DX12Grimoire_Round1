@@ -66,17 +66,10 @@ namespace pmd
 
 		// 頂点バッファー
 		Microsoft::WRL::ComPtr<ID3D12Resource> m_vertexBuffer;
-
-		// 頂点バッファービュー
 		D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
-
-		// インデックスの数
-		unsigned int m_numberOfIndex;
 
 		// インデックスバッファー
 		Microsoft::WRL::ComPtr<ID3D12Resource> m_indexBuffer;
-
-		// インデックスバッファービュー
 		D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
 
 		// マテリアルの数
@@ -93,6 +86,7 @@ namespace pmd
 
 	private:
 		HRESULT CreateVertexBuffer(ID3D12Device* const pD3D12Device, const std::vector<unsigned char>& rawVertices);
+		HRESULT CreateIndexBuffer(ID3D12Device* const pD3D12Device, const std::vector<unsigned short>& rawIndices);
 	};
 
 } // namespace pmd
