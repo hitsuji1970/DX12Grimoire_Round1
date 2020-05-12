@@ -35,9 +35,6 @@ public:
 	void BeginDraw();
 	void EndDraw();
 
-	/** コマンドリストの実行 */
-	void ExecuteCommandLists(UINT numCommandLists, ID3D12CommandList* const* ppCommandLists);
-
 	/** DirectXインターフェイスの取得 */
 	const ComPtr<ID3D12Device>& GetDevice() const
 	{

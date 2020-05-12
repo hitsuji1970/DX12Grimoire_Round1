@@ -89,6 +89,7 @@ HRESULT D3D12Environment::Initialize(HWND hWnd, UINT windowWidth, UINT windowHei
 	return S_OK;
 }
 
+// シーン全体の描画を開始
 void
 D3D12Environment::BeginDraw()
 {
@@ -113,7 +114,7 @@ D3D12Environment::BeginDraw()
 	_commandList->RSSetScissorRects(1, &_scissorRect);
 }
 
-
+// シーン全体の描画を終了
 void
 D3D12Environment::EndDraw()
 {
@@ -125,7 +126,15 @@ D3D12Environment::EndDraw()
 	_commandList->Close();
 
 	ID3D12CommandList* cmdLists[] = { _commandList.Get() };
-	ExecuteCommandLists(1, cmdLists);
+	_commandQueue->ExecuteCommandLists(1, cmdLists);
+	_commandQueue->Signal(_fence.Get(), ++_fenceVal);
+	if (_fence->GetCompletedValue() != _fenceVal) {
+		auto event = CreateEvent(nullptr, false, false, nullptr);
+		_fence->SetEventOnCompletion(_fenceVal, event);
+		WaitForSingleObject(event, INFINITE);
+		CloseHandle(event);
+	}
+	_commandAllocator->Reset();
 	_commandList->Reset(_commandAllocator.Get(), nullptr);
 
 	_swapChain->Present(1, 0);
@@ -155,9 +164,9 @@ D3D12Environment::InitializeDXGIDevice(HWND hWnd)
 	};
 
 	// ノートPC用にNVIDIAのグラフィックスを優先して検出
-	auto adapter = FindDXGIAdapter(L"NVIDIA");
+	ComPtr<IDXGIAdapter> adapter = FindDXGIAdapter(L"NVIDIA");
 	for (auto lv : levels) {
-		if (D3D12CreateDevice(adapter, lv, IID_PPV_ARGS(_device.ReleaseAndGetAddressOf())) == S_OK) {
+		if (D3D12CreateDevice(adapter.Get(), lv, IID_PPV_ARGS(_device.ReleaseAndGetAddressOf())) == S_OK) {
 			_featureLevel = lv;
 			break;
 		}
@@ -166,7 +175,6 @@ D3D12Environment::InitializeDXGIDevice(HWND hWnd)
 		::MessageBox(hWnd, TEXT("Error"), TEXT("D3Dデバイスの初期化に失敗しました。"), MB_ICONERROR);
 		return E_FAIL;
 	}
-	adapter->Release();
 
 	return S_OK;
 }
@@ -337,24 +345,6 @@ D3D12Environment::CreateDepthBuffer(UINT bufferWidth, UINT bufferHeight)
 	}
 
 	return S_OK;
-}
-
-
-/**
- * コマンドリストの実行
- */
-void D3D12Environment::ExecuteCommandLists(UINT numCommandLists, ID3D12CommandList* const* ppCommandLists)
-{
-	_commandQueue->ExecuteCommandLists(numCommandLists, ppCommandLists);
-	_commandQueue->Signal(_fence.Get(), ++_fenceVal);
-	if (_fence->GetCompletedValue() != _fenceVal) {
-		auto event = CreateEvent(nullptr, false, false, nullptr);
-		_fence->SetEventOnCompletion(_fenceVal, event);
-		WaitForSingleObject(event, INFINITE);
-		CloseHandle(event);
-	}
-
-	_commandAllocator->Reset();
 }
 
 // 複数のグラフィックスカードを搭載するシステムで特定のアダプターを取得
