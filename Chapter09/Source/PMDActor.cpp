@@ -60,8 +60,7 @@ namespace pmd
 		m_signature{}, m_header(),
 		m_vertexBuffer(nullptr), m_vertexBufferView{},
 		m_indexBuffer(nullptr), m_indexBufferView{},
-		m_numberOfMaterial(0), m_materialBuffer(nullptr),
-		m_materialDescHeap(nullptr), m_materials{}
+		m_materialBuffer(nullptr), m_materialDescHeap(nullptr), m_materials{}
 	{
 	}
 
@@ -118,12 +117,13 @@ namespace pmd
 		}
 
 		// マテリアルの読み込み
-		fread(&m_numberOfMaterial, sizeof(m_numberOfMaterial), 1, fp);
-		std::vector<SerializedMaterialData> serializedMaterials(m_numberOfMaterial);
+		unsigned int numberOfMaterial;
+		fread(&numberOfMaterial, sizeof(numberOfMaterial), 1, fp);
+		std::vector<SerializedMaterialData> serializedMaterials(numberOfMaterial);
 		fread(serializedMaterials.data(), serializedMaterials.size() * sizeof(SerializedMaterialData), 1, fp);
 		std::fclose(fp);
 
-		m_materials.resize(m_numberOfMaterial);
+		m_materials.resize(numberOfMaterial);
 		for (int i = 0; i < serializedMaterials.size(); i++) {
 			m_materials[i].LoadFromSerializedData(pD3D12Device, serializedMaterials[i], folderPath, toonTexturePath);
 #ifdef _DEBUG
@@ -132,55 +132,7 @@ namespace pmd
 		}
 
 		// マテリアルのバッファーを作成
-		auto materialBufferSize = sizeof(BasicMaterial);
-		materialBufferSize = (materialBufferSize + 0xff) & ~0xff;
-		result = pD3D12Device->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(materialBufferSize * m_numberOfMaterial),
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr, IID_PPV_ARGS(m_materialBuffer.ReleaseAndGetAddressOf())
-		);
-		if (FAILED(result)) {
-			return result;
-		}
-
-		unsigned char* pMappedMaterial = nullptr;
-		result = m_materialBuffer->Map(0, nullptr, (void**)&pMappedMaterial);
-		for (auto& material : m_materials) {
-			*reinterpret_cast<BasicMaterial*>(pMappedMaterial) = material.GetBasicMaterial();
-			pMappedMaterial += materialBufferSize;
-		}
-
-		D3D12_DESCRIPTOR_HEAP_DESC matDescHeapDesc = {};
-		matDescHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		matDescHeapDesc.NodeMask = 0;
-		matDescHeapDesc.NumDescriptors = m_numberOfMaterial * (1 + NUMBER_OF_TEXTURE);
-		matDescHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		result = pD3D12Device->CreateDescriptorHeap(&matDescHeapDesc, IID_PPV_ARGS(m_materialDescHeap.ReleaseAndGetAddressOf()));
-		if (FAILED(result)) {
-			return result;
-		}
-
-		D3D12_CONSTANT_BUFFER_VIEW_DESC matCBVDesc = {};
-		matCBVDesc.BufferLocation = m_materialBuffer->GetGPUVirtualAddress();
-		matCBVDesc.SizeInBytes = static_cast<UINT>(materialBufferSize);
-
-		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-		srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-		srvDesc.Texture2D.MipLevels = 1;
-
-		auto matDescHeapH = m_materialDescHeap->GetCPUDescriptorHandleForHeapStart();
-		auto incSize = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		for (auto i = 0u; i < m_numberOfMaterial; i++) {
-			pD3D12Device->CreateConstantBufferView(&matCBVDesc, matDescHeapH);
-			matCBVDesc.BufferLocation += materialBufferSize;
-			matDescHeapH.ptr += incSize;
-			m_materials[i].CreateTextureBuffers(pD3D12Device, &srvDesc, &matDescHeapH, incSize);
-		}
-
+		result = CreateMaterialBuffers(pD3D12Device, numberOfMaterial, serializedMaterials);
 		m_loadedModelPath = filename;
 		return S_OK;
 	}
@@ -263,6 +215,67 @@ namespace pmd
 		m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
 		m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
 		m_indexBufferView.SizeInBytes = static_cast<UINT>(rawIndices.size() * sizeof(rawIndices[0]));
+
+		return S_OK;
+	}
+
+	// マテリアルバッファーの作成
+	HRESULT PMDActor::CreateMaterialBuffers(
+		ID3D12Device* const pD3D12Device,
+		unsigned int numberOfMaterial,
+		const std::vector<SerializedMaterialData>& serializedMaterials
+	) {
+		HRESULT result;
+		auto materialBufferSize = sizeof(BasicMaterial);
+		materialBufferSize = (materialBufferSize + 0xff) & ~0xff;
+		result = pD3D12Device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(materialBufferSize * numberOfMaterial),
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr, IID_PPV_ARGS(m_materialBuffer.ReleaseAndGetAddressOf())
+		);
+		if (FAILED(result)) {
+			return result;
+		}
+
+		unsigned char* pMappedMaterial = nullptr;
+		result = m_materialBuffer->Map(0, nullptr, (void**)&pMappedMaterial);
+		for (auto& material : m_materials) {
+			*reinterpret_cast<BasicMaterial*>(pMappedMaterial) = material.GetBasicMaterial();
+			pMappedMaterial += materialBufferSize;
+		}
+
+		D3D12_DESCRIPTOR_HEAP_DESC matDescHeapDesc = {};
+		matDescHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		matDescHeapDesc.NodeMask = 0;
+		matDescHeapDesc.NumDescriptors = numberOfMaterial * (1 + NUMBER_OF_TEXTURE);
+		matDescHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		result = pD3D12Device->CreateDescriptorHeap(&matDescHeapDesc, IID_PPV_ARGS(m_materialDescHeap.ReleaseAndGetAddressOf()));
+		if (FAILED(result)) {
+			return result;
+		}
+
+		D3D12_CONSTANT_BUFFER_VIEW_DESC matCBVDesc = {};
+		matCBVDesc.BufferLocation = m_materialBuffer->GetGPUVirtualAddress();
+		matCBVDesc.SizeInBytes = static_cast<UINT>(materialBufferSize);
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = 1;
+
+		auto matDescHeapH = m_materialDescHeap->GetCPUDescriptorHandleForHeapStart();
+		auto incSize = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		for (auto i = 0u; i < numberOfMaterial; i++) {
+			pD3D12Device->CreateConstantBufferView(&matCBVDesc, matDescHeapH);
+			matCBVDesc.BufferLocation += materialBufferSize;
+			matDescHeapH.ptr += incSize;
+			m_materials[i].CreateTextureBuffers(pD3D12Device, &srvDesc, &matDescHeapH, incSize);
+		}
+
+		return S_OK;
 	}
 
 } // namespace pmd
