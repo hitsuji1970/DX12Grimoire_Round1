@@ -9,7 +9,8 @@ D3D12Environment::D3D12Environment() :
 	_commandAllocator(nullptr), _commandQueue(nullptr),
 	_swapChain(nullptr), _rtvHeaps(nullptr), _backBuffers{},
 	_dsvHeap(nullptr), _depthBuffer(nullptr),
-	_fence(nullptr), _fenceVal(0)
+	_fence(nullptr), _fenceVal(0),
+	_viewport{}, _scissorRect{}
 {
 }
 
@@ -73,7 +74,61 @@ HRESULT D3D12Environment::Initialize(HWND hWnd, UINT windowWidth, UINT windowHei
 		return result;
 	}
 
+	_viewport.Width = static_cast<float>(windowWidth);
+	_viewport.Height = static_cast<float>(windowHeight);
+	_viewport.TopLeftX = 0;
+	_viewport.TopLeftY = 0;
+	_viewport.MaxDepth = 1.0f;
+	_viewport.MinDepth = 0.0f;
+
+	_scissorRect.top = 0;
+	_scissorRect.left = 0;
+	_scissorRect.right = _scissorRect.left + windowWidth;
+	_scissorRect.bottom = _scissorRect.top + windowHeight;
+
 	return S_OK;
+}
+
+void
+D3D12Environment::BeginDraw()
+{
+	auto bbIdx = _swapChain->GetCurrentBackBufferIndex();
+	auto pBackBuffer = _backBuffers[bbIdx];
+
+	_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+		pBackBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+	//commandList->SetPipelineState(_pipelineState.Get());
+
+	auto rtvH = _rtvHeaps->GetCPUDescriptorHandleForHeapStart();
+	auto dsvH = _dsvHeap->GetCPUDescriptorHandleForHeapStart();
+	rtvH.ptr += static_cast<size_t>(bbIdx) * _device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	_commandList->OMSetRenderTargets(1, &rtvH, true, &dsvH);
+
+	float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	_commandList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
+	_commandList->ClearDepthStencilView(dsvH, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+
+	_commandList->RSSetViewports(1, &_viewport);
+	_commandList->RSSetScissorRects(1, &_scissorRect);
+}
+
+
+void
+D3D12Environment::EndDraw()
+{
+	auto bbIdx = _swapChain->GetCurrentBackBufferIndex();
+	auto pBackBuffer = _backBuffers[bbIdx];
+	_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+		pBackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+
+	_commandList->Close();
+
+	ID3D12CommandList* cmdLists[] = { _commandList.Get() };
+	ExecuteCommandLists(1, cmdLists);
+	_commandList->Reset(_commandAllocator.Get(), nullptr);
+
+	_swapChain->Present(1, 0);
 }
 
 // DXGIとDirectXデバイスの初期化

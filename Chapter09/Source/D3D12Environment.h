@@ -31,6 +31,10 @@ public:
 	/** 初期化 */
 	HRESULT Initialize(HWND hWnd, UINT windowWidth, UINT windowHeight);
 
+	// 描画開始
+	void BeginDraw();
+	void EndDraw();
+
 	/** コマンドリストの実行 */
 	void ExecuteCommandLists(UINT numCommandLists, ID3D12CommandList* const* ppCommandLists);
 
@@ -40,34 +44,9 @@ public:
 		return _device;
 	}
 
-	const ComPtr<IDXGISwapChain3> GetSwapChain() const
-	{
-		return _swapChain;
-	}
-
-	const ComPtr<ID3D12CommandAllocator> GetCommandAllocator() const
-	{
-		return _commandAllocator;
-	}
-
 	const ComPtr<ID3D12GraphicsCommandList> GetCommandList() const
 	{
 		return _commandList;
-	}
-
-	const ComPtr<ID3D12DescriptorHeap> GetRenderTargetViewHeaps() const
-	{
-		return _rtvHeaps;
-	}
-
-	const ComPtr<ID3D12DescriptorHeap> GetDepthStencilViewHeap() const
-	{
-		return _dsvHeap;
-	}
-
-	ID3D12Resource* GetBackBuffer(size_t index)
-	{
-		return _backBuffers[index];
 	}
 
 private:
@@ -101,6 +80,12 @@ private:
 	// フェンス
 	ComPtr<ID3D12Fence> _fence;
 	UINT64 _fenceVal;
+
+	// ビューポート
+	D3D12_VIEWPORT _viewport = {};
+
+	// シザー矩形
+	D3D12_RECT _scissorRect = {};
 
 private:
 	HRESULT InitializeDXGIDevice(HWND hWnd);

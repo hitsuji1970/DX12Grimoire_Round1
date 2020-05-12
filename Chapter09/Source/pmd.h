@@ -46,16 +46,6 @@ namespace pmd
 
 		HRESULT LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename, const std::wstring& toonTexturePath);
 
-		unsigned int GetNumberOfVertex()
-		{
-			return m_numberOfVertex;
-		}
-
-		unsigned int GetNumberOfIndex()
-		{
-			return m_numberOfIndex;
-		}
-
 		const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const
 		{
 			return m_vertexBufferView;

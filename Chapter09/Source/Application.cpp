@@ -22,8 +22,8 @@ const std::wstring ModelPath = MMDDataPath + L"/UserFile/Model";
 const std::wstring ToonBmpPath = MMDDataPath + L"/Data";
 
 Application::Application() :
-	_hWnd(nullptr), _basicDescHeap(nullptr),
-	_viewport{}, _scissorRect{}
+	_hWnd(nullptr), _wndClass(), _d3d12Env(nullptr), _basicDescHeap(nullptr),
+	_constBuff(nullptr), _mappedMatrix(nullptr), _pmdRenderer(nullptr)
 {
 }
 
@@ -31,10 +31,9 @@ Application::~Application()
 {
 }
 
-/**
- * 初期化処理
- */
-HRESULT Application::Initialize()
+// 初期化処理
+HRESULT
+Application::Initialize()
 {
 	HRESULT result = S_OK;
 
@@ -43,9 +42,9 @@ HRESULT Application::Initialize()
 		return E_FAIL;
 	}
 
-	d3d12Env.reset(new D3D12Environment());
-	d3d12Env->Initialize(_hWnd, DefaultWindowWidth, DefaultWindowHeight);
-	auto pDevice = d3d12Env->GetDevice();
+	_d3d12Env.reset(new D3D12Environment());
+	_d3d12Env->Initialize(_hWnd, DefaultWindowWidth, DefaultWindowHeight);
+	auto pDevice = _d3d12Env->GetDevice();
 
 	ShowWindow(_hWnd, SW_SHOW);
 
@@ -80,41 +79,24 @@ HRESULT Application::Initialize()
 	cbvDesc.SizeInBytes = static_cast<UINT>(_constBuff->GetDesc().Width);
 	pDevice->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
 
-	_pmdRenderer.reset(new pmd::PMDRenderer(d3d12Env->GetDevice().Get()));
+	_pmdRenderer.reset(new pmd::PMDRenderer(_d3d12Env->GetDevice().Get()));
 
 	result = pmd::PMDMaterial::LoadDefaultTextures(pDevice.Get());
 	result = mesh.LoadFromFile(pDevice.Get(), ModelPath + L"/初音ミク.pmd", ToonBmpPath);
 	//result = mesh.LoadFromFile(_device, ModelPath + L"/初音ミクmetal.pmd");
 	//result = mesh.LoadFromFile(_device, ModelPath + L"/巡音ルカ.pmd");
 
-	_viewport.Width = DefaultWindowWidth;
-	_viewport.Height = DefaultWindowHeight;
-	_viewport.TopLeftX = 0;
-	_viewport.TopLeftY = 0;
-	_viewport.MaxDepth = 1.0f;
-	_viewport.MinDepth = 0.0f;
-
-	_scissorRect.top = 0;
-	_scissorRect.left = 0;
-	_scissorRect.right = _scissorRect.left + DefaultWindowWidth;
-	_scissorRect.bottom = _scissorRect.top + DefaultWindowHeight;
-
 	return S_OK;
 }
 
-/**
- * 実行／更新処理
- */
-void Application::Run()
+// 実行／更新処理
+void
+Application::Run()
 {
 	MSG msg = {};
 	auto angle = 0.0f;
 
-	auto pDevice = d3d12Env->GetDevice();
-	auto swapChain = d3d12Env->GetSwapChain();
-	auto cmdAllocator = d3d12Env->GetCommandAllocator();
-	auto rtvHeaps = d3d12Env->GetRenderTargetViewHeaps();
-	auto dsvHeap = d3d12Env->GetDepthStencilViewHeap();
+	auto pDevice = _d3d12Env->GetDevice();
 
 	// 定数バッファーに行列を設定
 	DirectX::XMFLOAT3 eye(0, 15, -15);
@@ -131,7 +113,7 @@ void Application::Run()
 	_mappedMatrix->viewProj = viewMatrix * projectionMatrix;
 	_mappedMatrix->eye = eye;
 
-	auto commandList = d3d12Env->GetCommandList();
+	auto commandList = _d3d12Env->GetCommandList();
 
 	while (true) {
 		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
@@ -143,26 +125,8 @@ void Application::Run()
 			break;
 		}
 
-		auto bbIdx = swapChain->GetCurrentBackBufferIndex();
-		auto pBackBuffer = d3d12Env->GetBackBuffer(bbIdx);
-
-		commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-			pBackBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-		//commandList->SetPipelineState(_pipelineState.Get());
+		_d3d12Env->BeginDraw();
 		commandList->SetPipelineState(_pmdRenderer->GetPipelineState());
-
-		auto rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
-		auto dsvH = dsvHeap->GetCPUDescriptorHandleForHeapStart();
-		rtvH.ptr += static_cast<size_t>(bbIdx) * pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		commandList->OMSetRenderTargets(1, &rtvH, true, &dsvH);
-
-		float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-		commandList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
-		commandList->ClearDepthStencilView(dsvH, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
-		commandList->RSSetViewports(1, &_viewport);
-		commandList->RSSetScissorRects(1, &_scissorRect);
 
 		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		commandList->IASetVertexBuffers(0, 1, &mesh.GetVertexBufferView());
@@ -193,30 +157,19 @@ void Application::Run()
 		worldMatrix = DirectX::XMMatrixRotationY(angle);
 		_mappedMatrix->world = worldMatrix;
 
-		commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
-			pBackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
-
-		commandList->Close();
-
-		ID3D12CommandList* cmdLists[] = { commandList.Get() };
-		d3d12Env->ExecuteCommandLists(1, cmdLists);
-		//_cmdList->Reset(cmdAllocator, nullptr);
-		commandList->Reset(cmdAllocator.Get(), nullptr);
-
-		swapChain->Present(1, 0);
+		_d3d12Env->EndDraw();
 	}
 
 }
 
-/**
- * 終了処理
- */
-void Application::Terminate()
+// 終了処理
+void
+Application::Terminate()
 {
 	pmd::PMDMaterial::ReleaseDefaultTextures();
 
 	ID3D12DebugDevice* debugInterface;
-	if (SUCCEEDED(d3d12Env->GetDevice()->QueryInterface(&debugInterface)))
+	if (SUCCEEDED(_d3d12Env->GetDevice()->QueryInterface(&debugInterface)))
 	{
 		debugInterface->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL);
 		debugInterface->Release();
@@ -225,10 +178,9 @@ void Application::Terminate()
 	::UnregisterClass(_wndClass.lpszClassName, _wndClass.hInstance);
 }
 
-/**
- * ウィンドウの初期化
- */
-HWND Application::InitWindow(WNDCLASSEX* const pWndClass)
+// ウィンドウの初期化
+HWND
+Application::InitWindow(WNDCLASSEX* const pWndClass)
 {
 	pWndClass->cbSize = sizeof(WNDCLASSEX);
 	pWndClass->lpfnWndProc = WNDPROC(WindowProcedure);
@@ -255,10 +207,9 @@ HWND Application::InitWindow(WNDCLASSEX* const pWndClass)
 	return hWnd;
 }
 
-/**
- * ウィンドウプロシージャー
- */
-LRESULT Application::WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+// ウィンドウプロシージャー
+LRESULT
+Application::WindowProcedure(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
 	switch (msg)
 	{
