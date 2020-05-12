@@ -2,8 +2,10 @@
 
 #include <memory>
 #include <wrl.h>
+
 #include "D3D12Environment.h"
 #include "pmd.h"
+#include "PMDRenderer.h"
 
 // シェーダーに渡す行列
 struct SceneMatrix
@@ -55,15 +57,13 @@ private:
 	// DirectX 12描画環境
 	std::unique_ptr<D3D12Environment> d3d12Env;
 
-	// ルートシグネチャー
-	ComPtr<ID3D12RootSignature> _rootSignature;
-
-	// パイプラインステート
-	ComPtr<ID3D12PipelineState> _pipelineState;
-
 	ComPtr<ID3D12DescriptorHeap> _basicDescHeap;
 	ComPtr<ID3D12Resource> _constBuff;
 	SceneMatrix* _mappedMatrix;
+
+
+	std::unique_ptr<pmd::PMDRenderer> _pmdRenderer;
+
 
 	// ビューポート
 	D3D12_VIEWPORT _viewport = {};

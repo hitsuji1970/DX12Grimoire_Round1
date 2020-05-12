@@ -23,6 +23,9 @@
     <ClCompile Include="Source\D3D12Environment.cpp" />
     <ClCompile Include="Source\main.cpp" />
     <ClCompile Include="Source\utils.cpp" />
+    <ClCompile Include="Source\PMDRenderer.cpp">
+      <Filter>PMD</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\pmd.h">
@@ -34,6 +37,9 @@
     <ClInclude Include="Source\Application.h" />
     <ClInclude Include="Source\D3D12Environment.h" />
     <ClInclude Include="Source\utils.h" />
+    <ClInclude Include="Source\PMDRenderer.h">
+      <Filter>PMD</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Source\BasicPixelShader.hlsl">
