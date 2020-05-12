@@ -3,45 +3,93 @@
 #include <string>
 #include <vector>
 
-/**
- *コンストラクター
- */
+// コンストラクター
 D3D12Environment::D3D12Environment() :
-	_dxgiFactory(nullptr), _device(nullptr),
-	_cmdAllocator(nullptr), _cmdQueue(nullptr),
+	_dxgiFactory(nullptr), _device(nullptr), _featureLevel(D3D_FEATURE_LEVEL_1_0_CORE),
+	_commandAllocator(nullptr), _commandQueue(nullptr),
 	_swapChain(nullptr), _rtvHeaps(nullptr), _backBuffers{},
 	_dsvHeap(nullptr), _depthBuffer(nullptr),
 	_fence(nullptr), _fenceVal(0)
 {
 }
 
-/**
- * デストラクター
- */
+// デストラクター
 D3D12Environment::~D3D12Environment()
 {
 }
 
-/**
- * 初期化
- */
+
+// 初期化
 HRESULT D3D12Environment::Initialize(HWND hWnd, UINT windowWidth, UINT windowHeight)
 {
 	HRESULT result = S_OK;
 
-	// DXGI
 #ifdef _DEBUG
-	EnableDebugLayer();
-	if (FAILED(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(_dxgiFactory.ReleaseAndGetAddressOf())))) {
-		if (FAILED(CreateDXGIFactory2(0, IID_PPV_ARGS(_dxgiFactory.ReleaseAndGetAddressOf())))) {
-			return -1;
-		}
+	// デバッグレイヤーの有効化
+	ComPtr<ID3D12Debug> debugLayer = nullptr;
+	result = D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer));
+	if (SUCCEEDED(result))
+	{
+		debugLayer->EnableDebugLayer();
 	}
-#else
-	if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(_dxgiFactory.ReleaseAndGetAddressOf())))) {
-		return -1;
+	else
+	{
+		wprintf(L"failed to enable debug layer.\n");
 	}
 #endif // _DEBUG
+
+	// Direct3Dデバイスの初期化
+	if (FAILED(InitializeDXGIDevice(hWnd)))
+	{
+		return E_FAIL;
+	}
+
+	// コマンドアロケーター／コマンドリスト／コマンドキューの作成
+	if (FAILED(CreateCommandBuffers()))
+	{
+		return E_FAIL;
+	}
+
+	// スワップチェインの作成
+	if (FAILED(CreateSwapChain(hWnd, windowWidth, windowHeight)))
+	{
+		return E_FAIL;
+	}
+
+	// バックバッファーを作成してスワップチェインに紐付け
+	if (FAILED(CreateBackBuffers(hWnd, windowWidth, windowHeight)))
+	{
+		return E_FAIL;
+	}
+
+	if (FAILED(CreateDepthBuffer(windowWidth, windowHeight)))
+	{
+		return E_FAIL;
+	}
+
+	// フェンス
+	result = _device->CreateFence(_fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(_fence.ReleaseAndGetAddressOf()));
+	if (FAILED(result)) {
+		return result;
+	}
+
+	return S_OK;
+}
+
+// DXGIとDirectXデバイスの初期化
+HRESULT
+D3D12Environment::InitializeDXGIDevice(HWND hWnd)
+{
+#ifdef _DEBUG
+	UINT flagsDXGI = 0;
+	flagsDXGI |= DXGI_CREATE_FACTORY_DEBUG;
+	auto result = ::CreateDXGIFactory2(flagsDXGI, IID_PPV_ARGS(_dxgiFactory.ReleaseAndGetAddressOf()));
+#else
+	auto result = ::CreateDXGIFactory1(IID_PPV_ARGS(_dxgiFactory.ReleaseAndGetAddressOf()));
+#endif // _DEBUG
+	if (FAILED(result)) {
+		return result;
+	}
 
 	// グラフィックスカードがサポートする機能レベル
 	D3D_FEATURE_LEVEL levels[] = {
@@ -53,87 +101,64 @@ HRESULT D3D12Environment::Initialize(HWND hWnd, UINT windowWidth, UINT windowHei
 
 	// ノートPC用にNVIDIAのグラフィックスを優先して検出
 	auto adapter = FindDXGIAdapter(L"NVIDIA");
-	D3D_FEATURE_LEVEL featureLevel;
 	for (auto lv : levels) {
-		if (D3D12CreateDevice(adapter.Get(), lv, IID_PPV_ARGS(_device.ReleaseAndGetAddressOf())) == S_OK) {
-			featureLevel = lv;
+		if (D3D12CreateDevice(adapter, lv, IID_PPV_ARGS(_device.ReleaseAndGetAddressOf())) == S_OK) {
+			_featureLevel = lv;
 			break;
 		}
 	}
 	if (!_device) {
 		::MessageBox(hWnd, TEXT("Error"), TEXT("D3Dデバイスの初期化に失敗しました。"), MB_ICONERROR);
-		exit(-1);
+		return E_FAIL;
 	}
-
-	// コマンドアロケーター
-	result = _device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(_cmdAllocator.ReleaseAndGetAddressOf()));
-	if (FAILED(result)) {
-		return result;
-	}
-	_cmdAllocator->SetName(L"CommandAllocator");
-
-	// コマンドキュー
-	D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
-	cmdQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	cmdQueueDesc.NodeMask = 0;
-	cmdQueueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
-	cmdQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-	result = _device->CreateCommandQueue(&cmdQueueDesc, IID_PPV_ARGS(_cmdQueue.ReleaseAndGetAddressOf()));
-	if (FAILED(result)) {
-		return result;
-	}
-	_cmdQueue->SetName(L"CommandQueue");
-
-	// スワップチェインとバックバッファー
-	CreateBackBuffers(hWnd, windowWidth, windowHeight);
-	CreateDepthBuffer(windowWidth, windowHeight);
-
-	// フェンス
-	result = _device->CreateFence(_fenceVal, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(_fence.ReleaseAndGetAddressOf()));
-	if (FAILED(result)) {
-		return result;
-	}
+	adapter->Release();
 
 	return S_OK;
 }
 
-/**
- * コマンドリストインターフェイスオブジェクトの生成
- */
-HRESULT D3D12Environment::CreateCommandList(
-	UINT nodeMask,
-	D3D12_COMMAND_LIST_TYPE type,
-	ID3D12PipelineState* pInitialState,
-	REFIID riid,
-	void** ppCommandList)
+// コマンドアロケーター／コマンドリスト／コマンドキューの作成
+HRESULT
+D3D12Environment::CreateCommandBuffers()
 {
-	return _device->CreateCommandList(nodeMask, type, _cmdAllocator.Get(), pInitialState, riid, ppCommandList);
-}
+	constexpr D3D12_COMMAND_LIST_TYPE CommandListType = D3D12_COMMAND_LIST_TYPE_DIRECT;
+	constexpr UINT NodeMask = 0;
 
-/**
- * コマンドリストの実行
- */
-void D3D12Environment::ExecuteCommandLists(UINT numCommandLists, ID3D12CommandList* const* ppCommandLists)
-{
-	_cmdQueue->ExecuteCommandLists(numCommandLists, ppCommandLists);
-	_cmdQueue->Signal(_fence.Get(), ++_fenceVal);
-	if (_fence->GetCompletedValue() != _fenceVal) {
-		auto event = CreateEvent(nullptr, false, false, nullptr);
-		_fence->SetEventOnCompletion(_fenceVal, event);
-		WaitForSingleObject(event, INFINITE);
-		CloseHandle(event);
-	}
-
-	_cmdAllocator->Reset();
-}
-
-/**
- * スワップチェインとバックバッファーの生成
- */
-HRESULT D3D12Environment::CreateBackBuffers(HWND hWnd, UINT bufferWidth, UINT bufferHeight)
-{
 	HRESULT result;
 
+	// コマンドアロケーター
+	result = _device->CreateCommandAllocator(CommandListType, IID_PPV_ARGS(_commandAllocator.ReleaseAndGetAddressOf()));
+	if (FAILED(result)) {
+		return result;
+	}
+	_commandAllocator->SetName(L"CommandAllocator");
+
+	// コマンドリスト
+	//_device->CreateCommandList(0, type, _cmdAllocator.Get(), pInitialState, riid, ppCommandList);
+	result = _device->CreateCommandList(NodeMask, CommandListType, _commandAllocator.Get(), nullptr, IID_PPV_ARGS(_commandList.ReleaseAndGetAddressOf()));
+	if (FAILED(result)) {
+		return result;
+	}
+	_commandList->SetName(L"CommandList");
+
+	// コマンドキュー
+	D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
+	cmdQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+	cmdQueueDesc.NodeMask = NodeMask;
+	cmdQueueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
+	cmdQueueDesc.Type = CommandListType;
+	result = _device->CreateCommandQueue(&cmdQueueDesc, IID_PPV_ARGS(_commandQueue.ReleaseAndGetAddressOf()));
+	if (FAILED(result)) {
+		return result;
+	}
+	_commandQueue->SetName(L"CommandQueue");
+
+	return S_OK;
+}
+
+// スワップチェインの生成
+HRESULT
+D3D12Environment::CreateSwapChain(HWND hWnd, UINT bufferWidth, UINT bufferHeight)
+{
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
 	swapChainDesc.Width = bufferWidth;
 	swapChainDesc.Height = bufferHeight;
@@ -147,12 +172,23 @@ HRESULT D3D12Environment::CreateBackBuffers(HWND hWnd, UINT bufferWidth, UINT bu
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
 	swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-	result = _dxgiFactory->CreateSwapChainForHwnd(
-		_cmdQueue.Get(), hWnd, &swapChainDesc, nullptr, nullptr,
+
+	auto result = _dxgiFactory->CreateSwapChainForHwnd(
+		_commandQueue.Get(), hWnd, &swapChainDesc, nullptr, nullptr,
 		(IDXGISwapChain1**)_swapChain.ReleaseAndGetAddressOf());
+
 	if (FAILED(result)) {
 		return result;
 	}
+
+	return S_OK;
+}
+
+// バックバッファーの生成
+HRESULT
+D3D12Environment::CreateBackBuffers(HWND hWnd, UINT bufferWidth, UINT bufferHeight)
+{
+	HRESULT result;
 
 	// ディスクリプターヒープ
 	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
@@ -166,102 +202,115 @@ HRESULT D3D12Environment::CreateBackBuffers(HWND hWnd, UINT bufferWidth, UINT bu
 	}
 	_rtvHeaps->SetName(L"RenderTargetHeap");
 
-	// スワップチェインに関連付け
-	_backBuffers.resize(swapChainDesc.BufferCount);
-	D3D12_CPU_DESCRIPTOR_HANDLE cpuDescHandle = _rtvHeaps->GetCPUDescriptorHandleForHeapStart();
-	for (auto idx = 0u; idx < swapChainDesc.BufferCount; ++idx) {
-		result = _swapChain->GetBuffer(idx, IID_PPV_ARGS(&_backBuffers[idx]));
-		_device->CreateRenderTargetView(_backBuffers[idx], nullptr, cpuDescHandle);
-		cpuDescHandle.ptr += _device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	}
+	// スワップチェインにバインド
+	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
+	result = _swapChain->GetDesc1(&swapChainDesc);
 	if (FAILED(result)) {
 		return result;
+	}
+
+	_backBuffers.resize(swapChainDesc.BufferCount);
+	D3D12_CPU_DESCRIPTOR_HANDLE cpuDescHandle = _rtvHeaps->GetCPUDescriptorHandleForHeapStart();
+
+	for (auto idx = 0u; idx < swapChainDesc.BufferCount; ++idx) {
+		result = _swapChain->GetBuffer(idx, IID_PPV_ARGS(&_backBuffers[idx]));
+		if (FAILED(result)) {
+			return result;
+		}
+		wchar_t nameBuff[32];
+		swprintf_s(nameBuff, 32l, L"BackBuffer[%d]", idx);
+		_backBuffers[idx]->SetName(nameBuff);
+		_device->CreateRenderTargetView(_backBuffers[idx], nullptr, cpuDescHandle);
+		cpuDescHandle.ptr += _device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	}
 
 	return S_OK;
 }
 
-/**
- * 深度バッファーの生成
- */
-HRESULT D3D12Environment::CreateDepthBuffer(UINT bufferWidth, UINT bufferHeight)
+// 深度バッファーの生成
+HRESULT
+D3D12Environment::CreateDepthBuffer(UINT bufferWidth, UINT bufferHeight)
 {
 	HRESULT result = S_OK;
 
-	D3D12_RESOURCE_DESC depthResDesc = {};
-	depthResDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	depthResDesc.Width = bufferWidth;
-	depthResDesc.Height = bufferHeight;
-	depthResDesc.DepthOrArraySize = 1;
-	depthResDesc.Format = DXGI_FORMAT_D32_FLOAT;
-	depthResDesc.SampleDesc.Count = 1;
-	depthResDesc.SampleDesc.Quality = 0;
-	depthResDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-	depthResDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-	depthResDesc.MipLevels = 1;
-	depthResDesc.Alignment = 0;
+	D3D12_RESOURCE_DESC resDesc = {};
+	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	resDesc.Width = bufferWidth;
+	resDesc.Height = bufferHeight;
+	resDesc.DepthOrArraySize = 1;
+	resDesc.Format = DXGI_FORMAT_D32_FLOAT;
+	resDesc.SampleDesc.Count = 1;
+	resDesc.SampleDesc.Quality = 0;
+	resDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	resDesc.MipLevels = 1;
+	resDesc.Alignment = 0;
 
 	// 深度値ヒーププロパティ
-	D3D12_HEAP_PROPERTIES depthHeapProp = {};
-	depthHeapProp.Type = D3D12_HEAP_TYPE_DEFAULT;
-	depthHeapProp.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
-	depthHeapProp.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+	auto depthHeapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
 	// 深度クリアー値（最大値でクリアー）
-	D3D12_CLEAR_VALUE depthClearValue = {};
-	depthClearValue.DepthStencil.Depth = 1.0f;
-	depthClearValue.Format = DXGI_FORMAT_D32_FLOAT;
+	auto depthClearValue = CD3DX12_CLEAR_VALUE(DXGI_FORMAT_D32_FLOAT, 1.0f, 0);
 
 	// 深度バッファー本体
 	result = _device->CreateCommittedResource(
 		&depthHeapProp, D3D12_HEAP_FLAG_NONE,
-		&depthResDesc, D3D12_RESOURCE_STATE_DEPTH_WRITE,
+		&resDesc, D3D12_RESOURCE_STATE_DEPTH_WRITE,
 		&depthClearValue, IID_PPV_ARGS(_depthBuffer.ReleaseAndGetAddressOf()));
 	if (FAILED(result)) {
 		return result;
 	}
 
-	// 深度バッファー用のディスクリプターヒープ
+	// 深度バッファー用のディスクリプターヒープを作成
 	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
 	dsvHeapDesc.NumDescriptors = 1;
 	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	result = _device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(_dsvHeap.ReleaseAndGetAddressOf()));
 	if (FAILED(result)) {
 		return result;
 	}
 
-	// 深度ビュー
+	// 深度ビューを作成
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
 	dsvDesc.Format = DXGI_FORMAT_D32_FLOAT;
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 	dsvDesc.Flags = D3D12_DSV_FLAG_NONE;
 	_device->CreateDepthStencilView(_depthBuffer.Get(), &dsvDesc, _dsvHeap->GetCPUDescriptorHandleForHeapStart());
+	if (FAILED(result)) {
+		return result;
+	}
 
 	return S_OK;
 }
 
+
 /**
- * デバッグレイヤーの設定
+ * コマンドリストの実行
  */
-void D3D12Environment::EnableDebugLayer()
+void D3D12Environment::ExecuteCommandLists(UINT numCommandLists, ID3D12CommandList* const* ppCommandLists)
 {
-	ID3D12Debug* debugLayer = nullptr;
-	auto result = D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer));
-	debugLayer->EnableDebugLayer();
-	debugLayer->Release();
+	_commandQueue->ExecuteCommandLists(numCommandLists, ppCommandLists);
+	_commandQueue->Signal(_fence.Get(), ++_fenceVal);
+	if (_fence->GetCompletedValue() != _fenceVal) {
+		auto event = CreateEvent(nullptr, false, false, nullptr);
+		_fence->SetEventOnCompletion(_fenceVal, event);
+		WaitForSingleObject(event, INFINITE);
+		CloseHandle(event);
+	}
+
+	_commandAllocator->Reset();
 }
 
-/**
- * グラフィックスカードの選定
- */
-Microsoft::WRL::ComPtr<IDXGIAdapter> D3D12Environment::FindDXGIAdapter(const std::wstring& key)
+// 複数のグラフィックスカードを搭載するシステムで特定のアダプターを取得
+IDXGIAdapter*
+D3D12Environment::FindDXGIAdapter(const std::wstring& key)
 {
-	std::vector<ComPtr<IDXGIAdapter>> adapters;
-	ComPtr<IDXGIAdapter> tmpAdapter = nullptr;
-	ComPtr<IDXGIAdapter> adapter = nullptr;
+	std::vector<IDXGIAdapter*> adapters;
+	IDXGIAdapter* adapter = nullptr;
 
-	for (int i = 0; _dxgiFactory->EnumAdapters(i, &tmpAdapter) != DXGI_ERROR_NOT_FOUND; i++) {
-		adapters.push_back(tmpAdapter);
+	for (int i = 0; _dxgiFactory->EnumAdapters(i, &adapter) != DXGI_ERROR_NOT_FOUND; i++) {
+		adapters.emplace_back(adapter);
 	}
 
 	for (auto adpt : adapters) {
@@ -270,7 +319,9 @@ Microsoft::WRL::ComPtr<IDXGIAdapter> D3D12Environment::FindDXGIAdapter(const std
 		std::wstring strDesc = adesc.Description;
 		if (strDesc.find(key) != std::string::npos) {
 			adapter = adpt;
-			break;
+		}
+		else {
+			adpt->Release();
 		}
 	}
 

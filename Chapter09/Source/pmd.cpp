@@ -163,7 +163,7 @@ namespace pmd
 		for (int i = 0; i < serializedMaterials.size(); i++) {
 			m_materials[i].LoadFromSerializedData(pD3D12Device, serializedMaterials[i], folderPath, toonTexturePath);
 #ifdef _DEBUG
-			wprintf(L"material[%d]:");
+			wprintf(L"material[%d]:", i);
 #endif // _DEBUG
 		}
 

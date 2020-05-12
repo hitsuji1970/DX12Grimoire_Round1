@@ -22,7 +22,7 @@ const std::wstring ModelPath = MMDDataPath + L"/UserFile/Model";
 const std::wstring ToonBmpPath = MMDDataPath + L"/Data";
 
 Application::Application() :
-	_hWnd(nullptr), _cmdList(nullptr), _rootSignature(nullptr), _pipelineState(nullptr),
+	_hWnd(nullptr), _rootSignature(nullptr), _pipelineState(nullptr),
 	_basicDescHeap(nullptr),
 	_viewport{}, _scissorRect{}
 {
@@ -48,10 +48,10 @@ HRESULT Application::Initialize()
 	d3d12Env->Initialize(_hWnd, DefaultWindowWidth, DefaultWindowHeight);
 	auto pDevice = d3d12Env->GetDevice();
 
-	result = d3d12Env->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, nullptr, IID_PPV_ARGS(_cmdList.ReleaseAndGetAddressOf()));
-	if (FAILED(result)) {
-		return result;
-	}
+	//result = d3d12Env->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, nullptr, IID_PPV_ARGS(_cmdList.ReleaseAndGetAddressOf()));
+	//if (FAILED(result)) {
+	//	return result;
+	//}
 
 	ShowWindow(_hWnd, SW_SHOW);
 
@@ -264,6 +264,8 @@ void Application::Run()
 	_mappedMatrix->viewProj = viewMatrix * projectionMatrix;
 	_mappedMatrix->eye = eye;
 
+	auto commandList = d3d12Env->GetCommandList();
+
 	while (true) {
 		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
@@ -277,43 +279,43 @@ void Application::Run()
 		auto bbIdx = swapChain->GetCurrentBackBufferIndex();
 		auto pBackBuffer = d3d12Env->GetBackBuffer(bbIdx);
 
-		_cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+		commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
 			pBackBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-		_cmdList->SetPipelineState(_pipelineState.Get());
+		commandList->SetPipelineState(_pipelineState.Get());
 
 		auto rtvH = rtvHeaps->GetCPUDescriptorHandleForHeapStart();
 		auto dsvH = dsvHeap->GetCPUDescriptorHandleForHeapStart();
 		rtvH.ptr += static_cast<size_t>(bbIdx) * pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-		_cmdList->OMSetRenderTargets(1, &rtvH, true, &dsvH);
+		commandList->OMSetRenderTargets(1, &rtvH, true, &dsvH);
 
 		float clearColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-		_cmdList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
-		_cmdList->ClearDepthStencilView(dsvH, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+		commandList->ClearRenderTargetView(rtvH, clearColor, 0, nullptr);
+		commandList->ClearDepthStencilView(dsvH, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-		_cmdList->RSSetViewports(1, &_viewport);
-		_cmdList->RSSetScissorRects(1, &_scissorRect);
+		commandList->RSSetViewports(1, &_viewport);
+		commandList->RSSetScissorRects(1, &_scissorRect);
 
-		_cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		_cmdList->IASetVertexBuffers(0, 1, &mesh.GetVertexBufferView());
-		_cmdList->IASetIndexBuffer(&mesh.GetIndexBufferView());
+		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		commandList->IASetVertexBuffers(0, 1, &mesh.GetVertexBufferView());
+		commandList->IASetIndexBuffer(&mesh.GetIndexBufferView());
 
-		_cmdList->SetGraphicsRootSignature(_rootSignature.Get());
+		commandList->SetGraphicsRootSignature(_rootSignature.Get());
 
 		ID3D12DescriptorHeap* descHeaps[] = { _basicDescHeap.Get() };
-		_cmdList->SetDescriptorHeaps(1, descHeaps);
-		_cmdList->SetGraphicsRootDescriptorTable(0, _basicDescHeap->GetGPUDescriptorHandleForHeapStart());
+		commandList->SetDescriptorHeaps(1, descHeaps);
+		commandList->SetGraphicsRootDescriptorTable(0, _basicDescHeap->GetGPUDescriptorHandleForHeapStart());
 
 		ID3D12DescriptorHeap* materialDescHeap[] = { mesh.GetMaterialDescriptorHeap() };
-		_cmdList->SetDescriptorHeaps(1, materialDescHeap);
+		commandList->SetDescriptorHeaps(1, materialDescHeap);
 
 		auto materialH = materialDescHeap[0]->GetGPUDescriptorHandleForHeapStart();
 		auto cbvsrvIncSize = pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		cbvsrvIncSize *= (1 + pmd::PMDMesh::NUMBER_OF_TEXTURE);
 		unsigned int idxOffset = 0;
 		for (auto& material : mesh.GetMaterials()) {
-			_cmdList->SetGraphicsRootDescriptorTable(1, materialH);
-			_cmdList->DrawIndexedInstanced(material.GetIndicesNum(), 1, idxOffset, 0, 0);
+			commandList->SetGraphicsRootDescriptorTable(1, materialH);
+			commandList->DrawIndexedInstanced(material.GetIndicesNum(), 1, idxOffset, 0, 0);
 			materialH.ptr += cbvsrvIncSize;
 			idxOffset += material.GetIndicesNum();
 		}
@@ -322,15 +324,15 @@ void Application::Run()
 		worldMatrix = DirectX::XMMatrixRotationY(angle);
 		_mappedMatrix->world = worldMatrix;
 
-		_cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
+		commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
 			pBackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
-		_cmdList->Close();
+		commandList->Close();
 
-		ID3D12CommandList* cmdLists[] = { _cmdList.Get() };
+		ID3D12CommandList* cmdLists[] = { commandList.Get() };
 		d3d12Env->ExecuteCommandLists(1, cmdLists);
 		//_cmdList->Reset(cmdAllocator, nullptr);
-		_cmdList->Reset(cmdAllocator.Get(), nullptr);
+		commandList->Reset(cmdAllocator.Get(), nullptr);
 
 		swapChain->Present(1, 0);
 	}

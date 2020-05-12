@@ -53,10 +53,7 @@ private:
 	WNDCLASSEX _wndClass;
 
 	// DirectX 12描画環境
-	std::shared_ptr<D3D12Environment> d3d12Env;
-
-	// コマンドリスト
-	ComPtr<ID3D12GraphicsCommandList> _cmdList;
+	std::unique_ptr<D3D12Environment> d3d12Env;
 
 	// ルートシグネチャー
 	ComPtr<ID3D12RootSignature> _rootSignature;
