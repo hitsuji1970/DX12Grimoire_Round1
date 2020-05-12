@@ -58,7 +58,7 @@ namespace pmd
 	// コンストラクター
 	PMDActor::PMDActor() :
 		m_signature{}, m_header(),
-		m_numberOfVertex(0), m_vertexBuffer(nullptr), m_vertexBufferView{},
+		m_vertexBuffer(nullptr), m_vertexBufferView{},
 		m_numberOfIndex(0), m_indexBuffer(nullptr), m_indexBufferView{},
 		m_numberOfMaterial(0), m_materialBuffer(nullptr),
 		m_materialDescHeap(nullptr), m_materials{}
@@ -92,33 +92,18 @@ namespace pmd
 		std::fread(&m_header, sizeof(m_header), 1, fp);
 
 		// 頂点データの読み込みと頂点バッファーの生成
+		unsigned int numberOfVertex;
 		std::vector<unsigned char> rawVertices;
-		std::fread(&m_numberOfVertex, sizeof(m_numberOfVertex), 1, fp);
-		rawVertices.resize(m_numberOfVertex * VERTEX_SIZE);
+		std::fread(&numberOfVertex, sizeof(numberOfVertex), 1, fp);
+		rawVertices.resize(numberOfVertex * VERTEX_SIZE);
 		std::fread(rawVertices.data(), rawVertices.size(), 1, fp);
-		result = pD3D12Device->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(rawVertices.size() * sizeof(rawVertices[0])), D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr, IID_PPV_ARGS(m_vertexBuffer.ReleaseAndGetAddressOf())
-		);
-		if (FAILED(result)) {
+
+		result = CreateVertexBuffer(pD3D12Device, rawVertices);
+		if (FAILED(result))
+		{
 			std::fclose(fp);
 			return result;
 		}
-
-		unsigned char* mappedVertex = nullptr;
-		result = m_vertexBuffer->Map(0, nullptr, (void**)&mappedVertex);
-		if (FAILED(result)) {
-			std::fclose(fp);
-			return result;
-		}
-		std::copy(std::begin(rawVertices), std::end(rawVertices), mappedVertex);
-		m_vertexBuffer->Unmap(0, nullptr);
-		mappedVertex = nullptr;
-
-		m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-		m_vertexBufferView.SizeInBytes = static_cast<UINT>(rawVertices.size());
-		m_vertexBufferView.StrideInBytes = VERTEX_SIZE;
 
 		// インデックスデータの読み込みとインデックスバッファーの生成
 		std::vector<unsigned short> rawIndices;
@@ -238,6 +223,36 @@ namespace pmd
 			materialH.ptr += cbvsrvIncSize;
 			idxOffset += material.GetIndicesNum();
 		}
+	}
+
+	// 頂点バッファーの作成
+	HRESULT PMDActor::CreateVertexBuffer(ID3D12Device* const pD3D12Device, const std::vector<unsigned char>& rawVertices)
+	{
+		HRESULT result;
+
+		result = pD3D12Device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(rawVertices.size() * sizeof(rawVertices[0])), D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr, IID_PPV_ARGS(m_vertexBuffer.ReleaseAndGetAddressOf())
+		);
+		if (FAILED(result)) {
+			return result;
+		}
+
+		unsigned char* mappedVertex = nullptr;
+		result = m_vertexBuffer->Map(0, nullptr, (void**)&mappedVertex);
+		if (FAILED(result)) {
+			return result;
+		}
+		std::copy(std::begin(rawVertices), std::end(rawVertices), mappedVertex);
+		m_vertexBuffer->Unmap(0, nullptr);
+		mappedVertex = nullptr;
+
+		m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+		m_vertexBufferView.SizeInBytes = static_cast<UINT>(rawVertices.size());
+		m_vertexBufferView.StrideInBytes = VERTEX_SIZE;
+
+		return S_OK;
 	}
 
 } // namespace pmd

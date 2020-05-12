@@ -64,9 +64,6 @@ namespace pmd
 		// ヘッダー情報
 		PMDHeader m_header;
 
-		// 頂点数
-		unsigned int m_numberOfVertex;
-
 		// 頂点バッファー
 		Microsoft::WRL::ComPtr<ID3D12Resource> m_vertexBuffer;
 
@@ -93,6 +90,9 @@ namespace pmd
 
 		// マテリアル実体
 		std::vector<PMDMaterial> m_materials;
+
+	private:
+		HRESULT CreateVertexBuffer(ID3D12Device* const pD3D12Device, const std::vector<unsigned char>& rawVertices);
 	};
 
 } // namespace pmd
