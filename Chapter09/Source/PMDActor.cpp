@@ -55,9 +55,7 @@ namespace pmd
 		},
 	};
 
-	/**
-	 * コンストラクター
-	 */
+	// コンストラクター
 	PMDActor::PMDActor() :
 		m_signature{}, m_header(),
 		m_numberOfVertex(0), m_vertexBuffer(nullptr), m_vertexBufferView{},
@@ -67,16 +65,12 @@ namespace pmd
 	{
 	}
 
-	/**
-	 * デストラクター
-	 */
+	// デストラクター
 	PMDActor::~PMDActor()
 	{
 	}
 
-	/**
-	 * PMDファイルからの読み込み
-	 */
+	// PMDファイルからの読み込み
 	HRESULT PMDActor::LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename, const std::wstring& toonTexturePath)
 	{
 		HRESULT result;
@@ -222,6 +216,28 @@ namespace pmd
 		std::fclose(fp);
 		m_loadedModelPath = filename;
 		return S_OK;
+	}
+
+	// 描画
+	void PMDActor::Draw(ID3D12Device* const pD3D12Device, ID3D12GraphicsCommandList* const pCommandList)
+	{
+		pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		pCommandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+		pCommandList->IASetIndexBuffer(&m_indexBufferView);
+
+		ID3D12DescriptorHeap* materialDescHeap[] = { m_materialDescHeap.Get() };
+		pCommandList->SetDescriptorHeaps(1, materialDescHeap);
+
+		auto materialH = materialDescHeap[0]->GetGPUDescriptorHandleForHeapStart();
+		auto cbvsrvIncSize = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		cbvsrvIncSize *= (1 + pmd::PMDActor::NUMBER_OF_TEXTURE);
+		unsigned int idxOffset = 0;
+		for (const auto& material : m_materials) {
+			pCommandList->SetGraphicsRootDescriptorTable(1, materialH);
+			pCommandList->DrawIndexedInstanced(material.GetIndicesNum(), 1, idxOffset, 0, 0);
+			materialH.ptr += cbvsrvIncSize;
+			idxOffset += material.GetIndicesNum();
+		}
 	}
 
 } // namespace pmd

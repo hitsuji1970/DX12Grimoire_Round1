@@ -80,9 +80,10 @@ Application::Initialize()
 	pDevice->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
 
 	_pmdRenderer.reset(new pmd::PMDRenderer(_d3d12Env->GetDevice().Get()));
+	_pmdActor.reset(new pmd::PMDActor());
 
 	result = pmd::PMDMaterial::LoadDefaultTextures(pDevice.Get());
-	result = mesh.LoadFromFile(pDevice.Get(), ModelPath + L"/初音ミク.pmd", ToonBmpPath);
+	result = _pmdActor->LoadFromFile(pDevice.Get(), ModelPath + L"/初音ミク.pmd", ToonBmpPath);
 	//result = mesh.LoadFromFile(_device, ModelPath + L"/初音ミクmetal.pmd");
 	//result = mesh.LoadFromFile(_device, ModelPath + L"/巡音ルカ.pmd");
 
@@ -126,32 +127,14 @@ Application::Run()
 		}
 
 		_d3d12Env->BeginDraw();
-		commandList->SetPipelineState(_pmdRenderer->GetPipelineState());
-
-		commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		commandList->IASetVertexBuffers(0, 1, &mesh.GetVertexBufferView());
-		commandList->IASetIndexBuffer(&mesh.GetIndexBufferView());
-
-		//commandList->SetGraphicsRootSignature(_rootSignature.Get());
-		commandList->SetGraphicsRootSignature(_pmdRenderer->GetRootSingnature());
 
 		ID3D12DescriptorHeap* descHeaps[] = { _basicDescHeap.Get() };
+		commandList->SetPipelineState(_pmdRenderer->GetPipelineState());
+		commandList->SetGraphicsRootSignature(_pmdRenderer->GetRootSingnature());
+
 		commandList->SetDescriptorHeaps(1, descHeaps);
 		commandList->SetGraphicsRootDescriptorTable(0, _basicDescHeap->GetGPUDescriptorHandleForHeapStart());
-
-		ID3D12DescriptorHeap* materialDescHeap[] = { mesh.GetMaterialDescriptorHeap() };
-		commandList->SetDescriptorHeaps(1, materialDescHeap);
-
-		auto materialH = materialDescHeap[0]->GetGPUDescriptorHandleForHeapStart();
-		auto cbvsrvIncSize = pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		cbvsrvIncSize *= (1 + pmd::PMDActor::NUMBER_OF_TEXTURE);
-		unsigned int idxOffset = 0;
-		for (auto& material : mesh.GetMaterials()) {
-			commandList->SetGraphicsRootDescriptorTable(1, materialH);
-			commandList->DrawIndexedInstanced(material.GetIndicesNum(), 1, idxOffset, 0, 0);
-			materialH.ptr += cbvsrvIncSize;
-			idxOffset += material.GetIndicesNum();
-		}
+		_pmdActor->Draw(pDevice.Get(), commandList.Get());
 
 		angle += 0.01f;
 		worldMatrix = DirectX::XMMatrixRotationY(angle);
@@ -159,7 +142,6 @@ Application::Run()
 
 		_d3d12Env->EndDraw();
 	}
-
 }
 
 // 終了処理

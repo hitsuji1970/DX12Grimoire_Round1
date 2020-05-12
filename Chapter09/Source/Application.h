@@ -61,12 +61,9 @@ private:
 	ComPtr<ID3D12Resource> _constBuff;
 	SceneMatrix* _mappedMatrix;
 
-
+	// PMDモデル描画オブジェクト
 	std::unique_ptr<pmd::PMDRenderer> _pmdRenderer;
-
-
-	// PMDモデル
-	pmd::PMDActor mesh;
+	std::unique_ptr<pmd::PMDActor> _pmdActor;
 
 
 private:

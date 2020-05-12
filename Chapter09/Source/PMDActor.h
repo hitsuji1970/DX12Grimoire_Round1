@@ -44,35 +44,17 @@ namespace pmd
 		// 頂点レイアウト
 		static const std::vector<D3D12_INPUT_ELEMENT_DESC> InputLayout;
 
-		// シェーダーリソース用テクスチャーの数
-		static constexpr size_t NUMBER_OF_TEXTURE = 4;
-
 		PMDActor();
 		virtual ~PMDActor();
 
 		HRESULT LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename, const std::wstring& toonTexturePath);
 
-		const D3D12_VERTEX_BUFFER_VIEW& GetVertexBufferView() const
-		{
-			return m_vertexBufferView;
-		}
-
-		const D3D12_INDEX_BUFFER_VIEW& GetIndexBufferView() const
-		{
-			return m_indexBufferView;
-		}
-
-		ID3D12DescriptorHeap* GetMaterialDescriptorHeap()
-		{
-			return m_materialDescHeap.Get();
-		}
-
-		const std::vector<PMDMaterial>& GetMaterials() const
-		{
-			return m_materials;
-		}
+		void Draw(ID3D12Device* const pD3D12Device, ID3D12GraphicsCommandList* const pCommandList);
 
 	private:
+		// シェーダーリソース用テクスチャーの数
+		static constexpr size_t NUMBER_OF_TEXTURE = 4;
+
 		// ロードしたファイル名
 		std::wstring m_loadedModelPath;
 
