@@ -44,10 +44,11 @@ HRESULT Application::Initialize()
 		return E_FAIL;
 	}
 
-	d3d12Env.Initialize(_hWnd, DefaultWindowWidth, DefaultWindowHeight);
-	auto pDevice = d3d12Env.GetDevice();
+	d3d12Env.reset(new D3D12Environment());
+	d3d12Env->Initialize(_hWnd, DefaultWindowWidth, DefaultWindowHeight);
+	auto pDevice = d3d12Env->GetDevice();
 
-	result = d3d12Env.CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, nullptr, IID_PPV_ARGS(_cmdList.ReleaseAndGetAddressOf()));
+	result = d3d12Env->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, nullptr, IID_PPV_ARGS(_cmdList.ReleaseAndGetAddressOf()));
 	if (FAILED(result)) {
 		return result;
 	}
@@ -62,6 +63,7 @@ HRESULT Application::Initialize()
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(_constBuff.ReleaseAndGetAddressOf()));
+	_constBuff->SetName(L"ConstantBuffer");
 
 	// 行列をコピー
 	result = _constBuff->Map(0, nullptr, (void**)&_mappedMatrix);
@@ -75,6 +77,7 @@ HRESULT Application::Initialize()
 	descHeapDesc.NumDescriptors = 1;
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	result = pDevice->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(_basicDescHeap.ReleaseAndGetAddressOf()));
+	_basicDescHeap->SetName(L"BasicDescHeap");
 	auto basicHeapHandle = _basicDescHeap->GetCPUDescriptorHandleForHeapStart();
 
 	// シェーダーリソースビュー（定数バッファー）
@@ -83,8 +86,8 @@ HRESULT Application::Initialize()
 	cbvDesc.SizeInBytes = static_cast<UINT>(_constBuff->GetDesc().Width);
 	pDevice->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
 
-	result = pmd::PMDMaterial::LoadDefaultTextures(pDevice);
-	result = mesh.LoadFromFile(pDevice, ModelPath + L"/初音ミク.pmd", ToonBmpPath);
+	result = pmd::PMDMaterial::LoadDefaultTextures(pDevice.Get());
+	result = mesh.LoadFromFile(pDevice.Get(), ModelPath + L"/初音ミク.pmd", ToonBmpPath);
 	//result = mesh.LoadFromFile(_device, ModelPath + L"/初音ミクmetal.pmd");
 	//result = mesh.LoadFromFile(_device, ModelPath + L"/巡音ルカ.pmd");
 
@@ -215,6 +218,7 @@ HRESULT Application::Initialize()
 	pipelineStateDesc.SampleDesc.Quality = 0;
 
 	result = pDevice->CreateGraphicsPipelineState(&pipelineStateDesc, IID_PPV_ARGS(_pipelineState.ReleaseAndGetAddressOf()));
+	_pipelineState->SetName(L"PipelineState");
 
 	_viewport.Width = DefaultWindowWidth;
 	_viewport.Height = DefaultWindowHeight;
@@ -228,7 +232,6 @@ HRESULT Application::Initialize()
 	_scissorRect.right = _scissorRect.left + DefaultWindowWidth;
 	_scissorRect.bottom = _scissorRect.top + DefaultWindowHeight;
 
-
 	return S_OK;
 }
 
@@ -240,11 +243,11 @@ void Application::Run()
 	MSG msg = {};
 	auto angle = 0.0f;
 
-	auto pDevice = d3d12Env.GetDevice();
-	auto swapChain = d3d12Env.GetSwapChain();
-	auto cmdAllocator = d3d12Env.GetCommandAllocator();
-	auto rtvHeaps = d3d12Env.GetRenderTargetViewHeaps();
-	auto dsvHeap = d3d12Env.GetDepthStencilViewHeap();
+	auto pDevice = d3d12Env->GetDevice();
+	auto swapChain = d3d12Env->GetSwapChain();
+	auto cmdAllocator = d3d12Env->GetCommandAllocator();
+	auto rtvHeaps = d3d12Env->GetRenderTargetViewHeaps();
+	auto dsvHeap = d3d12Env->GetDepthStencilViewHeap();
 
 	// 定数バッファーに行列を設定
 	DirectX::XMFLOAT3 eye(0, 15, -15);
@@ -272,7 +275,7 @@ void Application::Run()
 		}
 
 		auto bbIdx = swapChain->GetCurrentBackBufferIndex();
-		auto pBackBuffer = d3d12Env.GetBackBuffer(bbIdx);
+		auto pBackBuffer = d3d12Env->GetBackBuffer(bbIdx);
 
 		_cmdList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
 			pBackBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
@@ -325,7 +328,8 @@ void Application::Run()
 		_cmdList->Close();
 
 		ID3D12CommandList* cmdLists[] = { _cmdList.Get() };
-		d3d12Env.ExecuteCommandLists(1, cmdLists);
+		d3d12Env->ExecuteCommandLists(1, cmdLists);
+		//_cmdList->Reset(cmdAllocator, nullptr);
 		_cmdList->Reset(cmdAllocator.Get(), nullptr);
 
 		swapChain->Present(1, 0);
@@ -338,6 +342,15 @@ void Application::Run()
  */
 void Application::Terminate()
 {
+	pmd::PMDMaterial::ReleaseDefaultTextures();
+
+	ID3D12DebugDevice* debugInterface;
+	if (SUCCEEDED(d3d12Env->GetDevice()->QueryInterface(&debugInterface)))
+	{
+		debugInterface->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL);
+		debugInterface->Release();
+	}
+
 	::UnregisterClass(_wndClass.lpszClassName, _wndClass.hInstance);
 }
 

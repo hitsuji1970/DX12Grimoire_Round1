@@ -35,31 +35,44 @@ namespace pmd
 	/**
 	 * 指定が無い場合に適用する加算・乗算テクスチャーのロード
 	 */
-	HRESULT PMDMaterial::LoadDefaultTextures(const ComPtr<ID3D12Device> d3dDevice)
+	HRESULT PMDMaterial::LoadDefaultTextures(ID3D12Device* pD3D12Device)
 	{
-		TheWhiteTexture = CreateSingleColorTexture(d3dDevice, 0xff, 0xff, 0xff, 0xff);
+		TheWhiteTexture = CreateSingleColorTexture(pD3D12Device, 0xff, 0xff, 0xff, 0xff);
 		if (TheWhiteTexture == nullptr) {
 			return E_FAIL;
 		}
+		TheWhiteTexture->SetName(L"White Texture");
 
-		TheBlackTexture = CreateSingleColorTexture(d3dDevice, 0x00, 0x00, 0x00, 0xff);
+		TheBlackTexture = CreateSingleColorTexture(pD3D12Device, 0x00, 0x00, 0x00, 0xff);
 		if (TheBlackTexture == nullptr) {
 			return E_FAIL;
 		}
+		TheBlackTexture->SetName(L"Black Texture");
 
-		TheGradTexture = CreateGrayGradationTexture(d3dDevice);
+		TheGradTexture = CreateGrayGradationTexture(pD3D12Device);
 		if (TheGradTexture == nullptr) {
 			return E_FAIL;
 		}
+		TheGradTexture->SetName(L"Grad Texture");
 
 		return S_OK;
+	}
+
+	void PMDMaterial::ReleaseDefaultTextures()
+	{
+		TheWhiteTexture->Release();
+		TheBlackTexture->Release();
+		TheGradTexture->Release();
+		for (auto res : SharedResources) {
+			res.second->Release();
+		}
 	}
 
 	/**
 	 * ファイルから読み込んだシリアライズ済みデータを展開
 	 */
 	HRESULT PMDMaterial::LoadFromSerializedData(
-		const ComPtr<ID3D12Device>& d3dDevice,
+		ID3D12Device* const pD3D12Device,
 		const SerializedMaterialData& serializedData,
 		const std::wstring& folderPath,
 		const std::wstring& toonTexturePath
@@ -83,26 +96,34 @@ namespace pmd
 				auto path = folderPath + L'/' + filename;
 				auto ext = ::GetExtension(filename);
 				if (ext == L"sph") {
-					pSPHResource = LoadTextureFromFile(d3dDevice, path);
+					pSPHResource = LoadTextureFromFile(pD3D12Device, path);
 				}
 				else if (ext == L"spa") {
-					pSPAResource = LoadTextureFromFile(d3dDevice, path);
+					pSPAResource = LoadTextureFromFile(pD3D12Device, path);
 				}
 				else {
-					pTextureResource = LoadTextureFromFile(d3dDevice, path);
+					pTextureResource = LoadTextureFromFile(pD3D12Device, path);
 				}
 			}
+#ifdef _DEBUG
+			wprintf(L" texture = \"%s\"\n", texPath.c_str());
+#endif // _DEBUG
+		}
+		else {
+#ifdef _DEBUG
+			wprintf(L"\n");
+#endif // _DEBUG
 		}
 
 		wchar_t toonFileName[16];
 		swprintf_s(toonFileName, L"/toon%02d.bmp", serializedData.toonIdx + 1);
-		pToonResource = LoadTextureFromFile(d3dDevice, toonTexturePath + toonFileName);
+		pToonResource = LoadTextureFromFile(pD3D12Device, toonTexturePath + toonFileName);
 
 		return result;
 	}
 
 	void PMDMaterial::CreateTextureBuffers(
-		const ComPtr<ID3D12Device>& d3dDevice,
+		ID3D12Device* pD3D12Device,
 		D3D12_SHADER_RESOURCE_VIEW_DESC* const pSRVDesc,
 		D3D12_CPU_DESCRIPTOR_HANDLE* const pDescriptorHandle,
 		UINT incSize
@@ -111,12 +132,12 @@ namespace pmd
 		if (pTextureResource)
 		{
 			pSRVDesc->Format = pTextureResource->GetDesc().Format;
-			d3dDevice->CreateShaderResourceView(pTextureResource.Get(), pSRVDesc, *pDescriptorHandle);
+			pD3D12Device->CreateShaderResourceView(pTextureResource.Get(), pSRVDesc, *pDescriptorHandle);
 		}
 		else
 		{
 			pSRVDesc->Format = TheWhiteTexture->GetDesc().Format;
-			d3dDevice->CreateShaderResourceView(TheWhiteTexture.Get(), pSRVDesc, *pDescriptorHandle);
+			pD3D12Device->CreateShaderResourceView(TheWhiteTexture.Get(), pSRVDesc, *pDescriptorHandle);
 		}
 		pDescriptorHandle->ptr += incSize;
 
@@ -124,12 +145,12 @@ namespace pmd
 		if (pSPHResource)
 		{
 			pSRVDesc->Format = pSPHResource->GetDesc().Format;
-			d3dDevice->CreateShaderResourceView(pSPHResource.Get(), pSRVDesc, *pDescriptorHandle);
+			pD3D12Device->CreateShaderResourceView(pSPHResource.Get(), pSRVDesc, *pDescriptorHandle);
 		}
 		else
 		{
 			pSRVDesc->Format = TheWhiteTexture->GetDesc().Format;
-			d3dDevice->CreateShaderResourceView(TheWhiteTexture.Get(), pSRVDesc, *pDescriptorHandle);
+			pD3D12Device->CreateShaderResourceView(TheWhiteTexture.Get(), pSRVDesc, *pDescriptorHandle);
 		}
 		pDescriptorHandle->ptr += incSize;
 
@@ -137,12 +158,12 @@ namespace pmd
 		if (pSPAResource)
 		{
 			pSRVDesc->Format = pSPAResource->GetDesc().Format;
-			d3dDevice->CreateShaderResourceView(pSPAResource.Get(), pSRVDesc, *pDescriptorHandle);
+			pD3D12Device->CreateShaderResourceView(pSPAResource.Get(), pSRVDesc, *pDescriptorHandle);
 		}
 		else
 		{
 			pSRVDesc->Format = TheBlackTexture->GetDesc().Format;
-			d3dDevice->CreateShaderResourceView(TheBlackTexture.Get(), pSRVDesc, *pDescriptorHandle);
+			pD3D12Device->CreateShaderResourceView(TheBlackTexture.Get(), pSRVDesc, *pDescriptorHandle);
 		}
 		pDescriptorHandle->ptr += incSize;
 
@@ -150,12 +171,12 @@ namespace pmd
 		if (pToonResource)
 		{
 			pSRVDesc->Format = pToonResource->GetDesc().Format;
-			d3dDevice->CreateShaderResourceView(pToonResource.Get(), pSRVDesc, *pDescriptorHandle);
+			pD3D12Device->CreateShaderResourceView(pToonResource.Get(), pSRVDesc, *pDescriptorHandle);
 		}
 		else
 		{
 			pSRVDesc->Format = TheGradTexture->GetDesc().Format;
-			d3dDevice->CreateShaderResourceView(TheGradTexture.Get(), pSRVDesc, *pDescriptorHandle);
+			pD3D12Device->CreateShaderResourceView(TheGradTexture.Get(), pSRVDesc, *pDescriptorHandle);
 		}
 		pDescriptorHandle->ptr += incSize;
 	}
@@ -163,7 +184,7 @@ namespace pmd
 	/**
 	 * テクスチャーをファイルからロード
 	 */
-	ID3D12Resource* PMDMaterial::LoadTextureFromFile(ComPtr<ID3D12Device> pD3D12Device, const std::wstring& filename)
+	ID3D12Resource* PMDMaterial::LoadTextureFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename)
 	{
 		auto it = SharedResources.find(filename);
 		if (it != SharedResources.end()) {
@@ -244,6 +265,7 @@ namespace pmd
 
 		SharedResources.emplace(filename, pTextureResource);
 
+		pTextureResource->SetName(filename.c_str());
 		return pTextureResource;
 	}
 }

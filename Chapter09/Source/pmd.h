@@ -44,7 +44,7 @@ namespace pmd
 		PMDMesh();
 		virtual ~PMDMesh();
 
-		HRESULT LoadFromFile(Microsoft::WRL::ComPtr<ID3D12Device> pD3D12Device, const std::wstring& filename, const std::wstring& toonTexturePath);
+		HRESULT LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename, const std::wstring& toonTexturePath);
 
 		unsigned int GetNumberOfVertex()
 		{

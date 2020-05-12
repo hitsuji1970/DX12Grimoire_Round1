@@ -56,13 +56,13 @@ std::wstring GetWString(const char* const rawString, size_t length)
 	return dstString;
 }
 
-/**
- * 単一色のテクスチャーを生成
+/*
+ * 中身が空のテクスチャーリソースを生成
  */
-ID3D12Resource* CreateSingleColorTexture(Microsoft::WRL::ComPtr<ID3D12Device> pD3D12Device, UINT8 r, UINT8 g, UINT8 b, UINT8 a)
+ID3D12Resource* CreateEmptyTexture(ID3D12Device* const pD3D12Device, DXGI_FORMAT format, UINT64 width, UINT height)
 {
+	auto resDesc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height);
 	auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_CPU_PAGE_PROPERTY_WRITE_BACK, D3D12_MEMORY_POOL_L0);
-	auto resDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, 4, 4);
 
 	ID3D12Resource* pTextureResource = nullptr;
 	auto result = pD3D12Device->CreateCommittedResource(
@@ -76,6 +76,28 @@ ID3D12Resource* CreateSingleColorTexture(Microsoft::WRL::ComPtr<ID3D12Device> pD
 		return nullptr;
 	}
 
+	return pTextureResource;
+}
+
+/*
+ * 中身が空のテクスチャーリソースを生成
+ */
+ID3D12Resource* CreateEmptyTexture(ID3D12Device* const pD3D12Device, UINT64 width, UINT height)
+{
+	return CreateEmptyTexture(pD3D12Device, DXGI_FORMAT_R8G8B8A8_UNORM, width, height);
+}
+
+/**
+ * 単一色のテクスチャーを生成
+ */
+ID3D12Resource* CreateSingleColorTexture(ID3D12Device* pD3D12Device, UINT8 r, UINT8 g, UINT8 b, UINT8 a)
+{
+	auto pTextureResource = CreateEmptyTexture(pD3D12Device, 4, 4);
+	if (pTextureResource == nullptr)
+	{
+		return nullptr;
+	}
+
 	std::vector<unsigned char> data(4 * 4 * 4);
 	for (size_t i = 0; i < 4 * 4; i++) {
 		data[i * 4 + 0] = r;
@@ -83,24 +105,23 @@ ID3D12Resource* CreateSingleColorTexture(Microsoft::WRL::ComPtr<ID3D12Device> pD
 		data[i * 4 + 2] = b;
 		data[i * 4 + 3] = a;
 	}
-	result = pTextureResource->WriteToSubresource(0, nullptr, data.data(), 4 * 4, static_cast<UINT>(data.size()));
+	auto result = pTextureResource->WriteToSubresource(0, nullptr, data.data(), 4 * 4, static_cast<UINT>(data.size()));
+	if (FAILED(result))
+	{
+		pTextureResource->Release();
+		return nullptr;
+	}
 
 	return pTextureResource;
 }
 
-ID3D12Resource* CreateGrayGradationTexture(Microsoft::WRL::ComPtr<ID3D12Device> pD3D12Device)
+/**
+ * 白黒のグラデーションテクスチャーを生成
+ */
+ID3D12Resource* CreateGrayGradationTexture(ID3D12Device* const pD3D12Device)
 {
-	auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_CPU_PAGE_PROPERTY_WRITE_BACK, D3D12_MEMORY_POOL_L0);
-	auto resDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, 4, 256);
-
-	ID3D12Resource* pTextureResource = nullptr;
-	auto result = pD3D12Device->CreateCommittedResource(
-		&heapProp, D3D12_HEAP_FLAG_NONE,
-		&resDesc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-		nullptr, IID_PPV_ARGS(&pTextureResource)
-	);
-
-	if (FAILED(result))
+	auto pTextureResource = CreateEmptyTexture(pD3D12Device, 4, 4);
+	if (pTextureResource == nullptr)
 	{
 		return nullptr;
 	}
@@ -113,9 +134,14 @@ ID3D12Resource* CreateGrayGradationTexture(Microsoft::WRL::ComPtr<ID3D12Device> 
 		std::fill(it, it + 4, col);
 		--c;
 	}
-	result = pTextureResource->WriteToSubresource(
+	auto result = pTextureResource->WriteToSubresource(
 		0, nullptr, data.data(), 4 * sizeof(unsigned int),
 		sizeof(unsigned int) * static_cast<UINT>(data.size()));
+	if (FAILED(result))
+	{
+		pTextureResource->Release();
+		return nullptr;
+	}
 
 	return pTextureResource;
 }

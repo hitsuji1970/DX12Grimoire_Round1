@@ -1,70 +1,51 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="ソース ファイル">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
-    <Filter Include="ヘッダー ファイル">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
-    </Filter>
     <Filter Include="リソース ファイル">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="シェーダーファイル">
+    <Filter Include="PMD">
+      <UniqueIdentifier>{b7fb49aa-8cca-4f17-b43b-1ec43580adf7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shader">
       <UniqueIdentifier>{68599c3d-1405-4066-b6c6-c459aca8b4c2}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source\main.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="Source\pmd.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\utils.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Application.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\D3D12Environment.cpp">
-      <Filter>ソース ファイル</Filter>
+      <Filter>PMD</Filter>
     </ClCompile>
     <ClCompile Include="Source\PMDMaterial.cpp">
-      <Filter>ソース ファイル</Filter>
+      <Filter>PMD</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Application.cpp" />
+    <ClCompile Include="Source\D3D12Environment.cpp" />
+    <ClCompile Include="Source\main.cpp" />
+    <ClCompile Include="Source\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\pmd.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\utils.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Application.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\D3D12Environment.h">
-      <Filter>ヘッダー ファイル</Filter>
+      <Filter>PMD</Filter>
     </ClInclude>
     <ClInclude Include="Source\PMDMaterial.h">
-      <Filter>ヘッダー ファイル</Filter>
+      <Filter>PMD</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Application.h" />
+    <ClInclude Include="Source\D3D12Environment.h" />
+    <ClInclude Include="Source\utils.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Source\BasicPixelShader.hlsl">
-      <Filter>シェーダーファイル</Filter>
+      <Filter>Shader</Filter>
     </FxCompile>
     <FxCompile Include="Source\BasicVertexShader.hlsl">
-      <Filter>シェーダーファイル</Filter>
+      <Filter>Shader</Filter>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="Source\BasicShaderHeader.hlsli">
-      <Filter>シェーダーファイル</Filter>
+      <Filter>Shader</Filter>
     </None>
   </ItemGroup>
 </Project>

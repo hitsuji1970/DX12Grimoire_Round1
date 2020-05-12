@@ -51,14 +51,24 @@ std::string GetExtension(const std::string& path);
 std::wstring GetExtension(const std::wstring& path);
 
 /**
+ * 中身が空のテクスチャーリソースを生成
+ */
+ID3D12Resource* CreateEmptyTexture(ID3D12Device* const pD3D12Device, UINT64 width, UINT height);
+
+/**
+ * 中身が空のテクスチャーリソースを生成
+ */
+ID3D12Resource* CreateEmptyTexture(ID3D12Device* const pD3D12Device, DXGI_FORMAT format, UINT64 width, UINT height);
+
+/**
  * 単一色のテクスチャーを生成
  */
-ID3D12Resource* CreateSingleColorTexture(Microsoft::WRL::ComPtr<ID3D12Device> pD3D12Device, UINT8 r, UINT8 g, UINT8 b, UINT8 a);
+ID3D12Resource* CreateSingleColorTexture(ID3D12Device* const pD3D12Device, UINT8 r, UINT8 g, UINT8 b, UINT8 a);
 
 /**
  * 白黒のグラデーションテクスチャーを生成
  */
-ID3D12Resource* CreateGrayGradationTexture(Microsoft::WRL::ComPtr<ID3D12Device> pD3D12Device);
+ID3D12Resource* CreateGrayGradationTexture(ID3D12Device* const pD3D12Device);
 
 /**
  * デバッグ出力

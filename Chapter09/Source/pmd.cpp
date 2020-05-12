@@ -77,7 +77,7 @@ namespace pmd
 	/**
 	 * PMDファイルからの読み込み
 	 */
-	HRESULT PMDMesh::LoadFromFile(ComPtr<ID3D12Device> pD3D12Device, const std::wstring& filename, const std::wstring& toonTexturePath)
+	HRESULT PMDMesh::LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename, const std::wstring& toonTexturePath)
 	{
 		HRESULT result;
 		FILE* fp = nullptr;
@@ -162,6 +162,9 @@ namespace pmd
 		m_materials.resize(m_numberOfMaterial);
 		for (int i = 0; i < serializedMaterials.size(); i++) {
 			m_materials[i].LoadFromSerializedData(pD3D12Device, serializedMaterials[i], folderPath, toonTexturePath);
+#ifdef _DEBUG
+			wprintf(L"material[%d]:");
+#endif // _DEBUG
 		}
 
 		// マテリアルのバッファーを作成
@@ -214,10 +217,6 @@ namespace pmd
 			matCBVDesc.BufferLocation += materialBufferSize;
 			matDescHeapH.ptr += incSize;
 			m_materials[i].CreateTextureBuffers(pD3D12Device, &srvDesc, &matDescHeapH, incSize);
-
-#ifdef _DEBUG
-			wprintf(L"material[%d]; texture=\"%s\"\n", i, filename.c_str());
-#endif // _DEBUG
 		}
 
 		std::fclose(fp);

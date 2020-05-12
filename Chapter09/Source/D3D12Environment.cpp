@@ -70,6 +70,7 @@ HRESULT D3D12Environment::Initialize(HWND hWnd, UINT windowWidth, UINT windowHei
 	if (FAILED(result)) {
 		return result;
 	}
+	_cmdAllocator->SetName(L"CommandAllocator");
 
 	// コマンドキュー
 	D3D12_COMMAND_QUEUE_DESC cmdQueueDesc = {};
@@ -81,6 +82,7 @@ HRESULT D3D12Environment::Initialize(HWND hWnd, UINT windowWidth, UINT windowHei
 	if (FAILED(result)) {
 		return result;
 	}
+	_cmdQueue->SetName(L"CommandQueue");
 
 	// スワップチェインとバックバッファー
 	CreateBackBuffers(hWnd, windowWidth, windowHeight);
@@ -162,6 +164,7 @@ HRESULT D3D12Environment::CreateBackBuffers(HWND hWnd, UINT bufferWidth, UINT bu
 	if (FAILED(result)) {
 		return result;
 	}
+	_rtvHeaps->SetName(L"RenderTargetHeap");
 
 	// スワップチェインに関連付け
 	_backBuffers.resize(swapChainDesc.BufferCount);

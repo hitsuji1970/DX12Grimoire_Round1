@@ -4,7 +4,7 @@
 #include <vector>
 
 #include <d3d12.h>
-#include <dxgi1_6.h>
+#include <dxgi1_4.h>
 #include <wrl.h>
 
 #pragma comment(lib, "d3d12.lib")
@@ -43,7 +43,7 @@ public:
 		return _device;
 	}
 
-	const ComPtr<IDXGISwapChain4> GetSwapChain() const
+	const ComPtr<IDXGISwapChain3> GetSwapChain() const
 	{
 		return _swapChain;
 	}
@@ -70,7 +70,7 @@ public:
 
 private:
 	/** ディスプレイアダプターのインターフェイス */
-	ComPtr<IDXGIFactory6> _dxgiFactory;
+	ComPtr<IDXGIFactory4> _dxgiFactory;
 
 	/** DirectXデバイスインターフェイス */
 	ComPtr<ID3D12Device> _device;
@@ -82,7 +82,7 @@ private:
 	ComPtr<ID3D12CommandQueue> _cmdQueue;
 
 	/** フレームバッファー */
-	ComPtr<IDXGISwapChain4> _swapChain;
+	ComPtr<IDXGISwapChain3> _swapChain;
 	ComPtr<ID3D12DescriptorHeap> _rtvHeaps = nullptr;
 	std::vector<ID3D12Resource*> _backBuffers;
 

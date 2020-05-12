@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include <memory>
 #include <wrl.h>
 #include "D3D12Environment.h"
 #include "pmd.h"
@@ -52,7 +53,7 @@ private:
 	WNDCLASSEX _wndClass;
 
 	// DirectX 12描画環境
-	D3D12Environment d3d12Env;
+	std::shared_ptr<D3D12Environment> d3d12Env;
 
 	// コマンドリスト
 	ComPtr<ID3D12GraphicsCommandList> _cmdList;

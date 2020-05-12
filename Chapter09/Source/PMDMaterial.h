@@ -53,18 +53,19 @@ namespace pmd
 		virtual ~PMDMaterial();
 
 		/** 共通のデフォルトテクスチャーをロード */
-		static HRESULT LoadDefaultTextures(const Microsoft::WRL::ComPtr<ID3D12Device> d3dDevice);
+		static HRESULT LoadDefaultTextures(ID3D12Device* const pD3d12Device);
+		static void ReleaseDefaultTextures();
 
 		/** ファイルから読み込んだシリアライズ済みデータの展開 */
 		HRESULT LoadFromSerializedData(
-			const Microsoft::WRL::ComPtr<ID3D12Device>& d3dDevice,
+			ID3D12Device* const pD3D12Device,
 			const SerializedMaterialData& serealizedData,
 			const std::wstring& folderPath,
 			const std::wstring& toonTexturePath);
 
 		/** テクスチャー用バッファーリソースの生成 */
 		void CreateTextureBuffers(
-			const Microsoft::WRL::ComPtr<ID3D12Device>& d3dDevice,
+			ID3D12Device* const pD3D12Device,
 			D3D12_SHADER_RESOURCE_VIEW_DESC* const pSRVDesc,
 			D3D12_CPU_DESCRIPTOR_HANDLE* const pDescriptorHeapHandle,
 			UINT incSize);
@@ -103,7 +104,7 @@ namespace pmd
 
 	private:
 		// テクスチャーをファイルからロード
-		ID3D12Resource* LoadTextureFromFile(Microsoft::WRL::ComPtr<ID3D12Device> pD3D12Device, const std::wstring& filename);
+		ID3D12Resource* LoadTextureFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename);
 	};
 }
 
