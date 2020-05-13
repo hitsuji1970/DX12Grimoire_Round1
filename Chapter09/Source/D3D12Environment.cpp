@@ -63,6 +63,7 @@ HRESULT D3D12Environment::Initialize(HWND hWnd, UINT windowWidth, UINT windowHei
 		return E_FAIL;
 	}
 
+	// 深度バッファーの生成
 	if (FAILED(CreateDepthBuffer(windowWidth, windowHeight)))
 	{
 		return E_FAIL;
@@ -118,13 +119,16 @@ D3D12Environment::BeginDraw()
 void
 D3D12Environment::EndDraw()
 {
+	// バックバッファーの準備
 	auto bbIdx = _swapChain->GetCurrentBackBufferIndex();
 	auto pBackBuffer = _backBuffers[bbIdx];
 	_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
 		pBackBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
+	// コマンド受付終了
 	_commandList->Close();
 
+	// コマンドキューを通してコマンドリストを実行
 	ID3D12CommandList* cmdLists[] = { _commandList.Get() };
 	_commandQueue->ExecuteCommandLists(1, cmdLists);
 	_commandQueue->Signal(_fence.Get(), ++_fenceVal);
@@ -134,9 +138,12 @@ D3D12Environment::EndDraw()
 		WaitForSingleObject(event, INFINITE);
 		CloseHandle(event);
 	}
+
+	// コマンドバッファーの内容をリセット
 	_commandAllocator->Reset();
 	_commandList->Reset(_commandAllocator.Get(), nullptr);
 
+	// バックバッファーの切替え
 	_swapChain->Present(1, 0);
 }
 
@@ -196,7 +203,6 @@ D3D12Environment::CreateCommandBuffers()
 	_commandAllocator->SetName(L"CommandAllocator");
 
 	// コマンドリスト
-	//_device->CreateCommandList(0, type, _cmdAllocator.Get(), pInitialState, riid, ppCommandList);
 	result = _device->CreateCommandList(NodeMask, CommandListType, _commandAllocator.Get(), nullptr, IID_PPV_ARGS(_commandList.ReleaseAndGetAddressOf()));
 	if (FAILED(result)) {
 		return result;
@@ -253,25 +259,26 @@ D3D12Environment::CreateBackBuffers(HWND hWnd, UINT bufferWidth, UINT bufferHeig
 {
 	HRESULT result;
 
-	// ディスクリプターヒープ
-	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
-	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-	heapDesc.NodeMask = 0;
-	heapDesc.NumDescriptors = 2;
-	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-	result = _device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(_rtvHeaps.ReleaseAndGetAddressOf()));
-	if (FAILED(result)) {
-		return result;
-	}
-	_rtvHeaps->SetName(L"RenderTargetHeap");
-
-	// スワップチェインにバインド
+	// スワップチェインの情報
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
 	result = _swapChain->GetDesc1(&swapChainDesc);
 	if (FAILED(result)) {
 		return result;
 	}
 
+	// ディスクリプターヒープ
+	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+	heapDesc.NodeMask = 0;
+	heapDesc.NumDescriptors = swapChainDesc.BufferCount;
+	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	result = _device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(_rtvHeaps.ReleaseAndGetAddressOf()));
+	if (FAILED(result)) {
+		return result;
+	}
+	_rtvHeaps->SetName(L"RenderTargetView");
+
+	// スワップチェインにバインド
 	_backBuffers.resize(swapChainDesc.BufferCount);
 	D3D12_CPU_DESCRIPTOR_HANDLE cpuDescHandle = _rtvHeaps->GetCPUDescriptorHandleForHeapStart();
 
@@ -343,6 +350,7 @@ D3D12Environment::CreateDepthBuffer(UINT bufferWidth, UINT bufferHeight)
 	if (FAILED(result)) {
 		return result;
 	}
+	_dsvHeap->SetName(L"DepthStencilView");
 
 	return S_OK;
 }

@@ -22,20 +22,17 @@ private:
 	template<typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 public:
-	/** コンストラクター */
 	D3D12Environment();
-
-	/** デストラクター */
 	virtual ~D3D12Environment();
 
-	/** 初期化 */
+	// 初期化
 	HRESULT Initialize(HWND hWnd, UINT windowWidth, UINT windowHeight);
 
-	// 描画開始
+	// 描画の開始と終了
 	void BeginDraw();
 	void EndDraw();
 
-	/** DirectXインターフェイスの取得 */
+	// DirectXインターフェイスの取得
 	const ComPtr<ID3D12Device>& GetDevice() const
 	{
 		return _device;

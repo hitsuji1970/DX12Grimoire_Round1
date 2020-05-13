@@ -59,19 +59,21 @@ namespace pmd
 	{
 		HRESULT result;
 
-		// シェーダー
+		// 頂点シェーダー
 		ComPtr<ID3DBlob> _vsBlob = nullptr;
 		result = CompileShaderFromFile(L"Source/BasicVertexShader.hlsl", "BasicVS", "vs_5_0", _vsBlob.ReleaseAndGetAddressOf());
 		if (FAILED(result)) {
 			return result;
 		}
 
+		// ピクセルシェーダー
 		ComPtr<ID3DBlob> _psBlob = nullptr;
 		result = CompileShaderFromFile(L"Source/BasicPixelShader.hlsl", "BasicPS", "ps_5_0", _psBlob.ReleaseAndGetAddressOf());
 		if (FAILED(result)) {
 			return result;
 		}
 
+		// パイプラインステートの設定
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineStateDesc = {};
 		pipelineStateDesc.pRootSignature = _rootSignature.Get();
 		pipelineStateDesc.VS = CD3DX12_SHADER_BYTECODE(_vsBlob.Get());
@@ -119,12 +121,14 @@ namespace pmd
 		descTblRanges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 0); // テクスチャー4つ（diffuse, sph, spa, toon）
 
 		CD3DX12_ROOT_PARAMETER rootParams[2] = {};
-		// descTableRanges[0]から1つ
+		// descTableRanges[0]から連続する1つという意味
 		rootParams[0].InitAsDescriptorTable(1, &descTblRanges[0]);
-		// descTableRanges[1]から2つ
+		// descTableRanges[1]から連続する2つという意味
 		rootParams[1].InitAsDescriptorTable(2, &descTblRanges[1], D3D12_SHADER_VISIBILITY_PIXEL);
 
 		// サンプラー設定
+		// slot0:ディフューズ用
+		// slot1:トゥーン用
 		D3D12_STATIC_SAMPLER_DESC samplerDescs[2] = {};
 		samplerDescs[0] = CD3DX12_STATIC_SAMPLER_DESC(0, D3D12_FILTER_MIN_MAG_MIP_POINT);
 		samplerDescs[0].BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
@@ -164,6 +168,7 @@ namespace pmd
 		return S_OK;
 	}
 
+	// ファイルから読み込んでシェーダーをコンパイル
 	HRESULT PMDRenderer::CompileShaderFromFile(LPCWSTR pFileName, LPCSTR pEntrypoint, LPCSTR pShaderModel, ID3DBlob** ppByteCode)
 	{
 		ComPtr<ID3DBlob> errorBlob = nullptr;
@@ -187,5 +192,7 @@ namespace pmd
 			}
 			return result;
 		}
+
+		return S_OK;
 	}
 }
