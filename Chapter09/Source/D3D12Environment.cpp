@@ -1,11 +1,11 @@
 ﻿#include "D3D12Environment.h"
+
+// DirectX
 #include <d3dx12.h>
-#include <string>
-#include <vector>
 
 // コンストラクター
 D3D12Environment::D3D12Environment() :
-	_dxgiFactory(nullptr), _device(nullptr), _featureLevel(D3D_FEATURE_LEVEL_1_0_CORE),
+	_dxgiFactory(nullptr), _device(nullptr), _featureLevel{},
 	_commandAllocator(nullptr), _commandQueue(nullptr),
 	_swapChain(nullptr), _rtvHeaps(nullptr), _backBuffers{},
 	_dsvHeap(nullptr), _depthBuffer(nullptr),
@@ -27,7 +27,7 @@ HRESULT D3D12Environment::Initialize(HWND hWnd, UINT windowWidth, UINT windowHei
 
 #ifdef _DEBUG
 	// デバッグレイヤーの有効化
-	ComPtr<ID3D12Debug> debugLayer = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Debug> debugLayer = nullptr;
 	result = D3D12GetDebugInterface(IID_PPV_ARGS(&debugLayer));
 	if (SUCCEEDED(result))
 	{
@@ -75,6 +75,7 @@ HRESULT D3D12Environment::Initialize(HWND hWnd, UINT windowWidth, UINT windowHei
 		return result;
 	}
 
+	// ビューポートとシザー矩形
 	_viewport.Width = static_cast<float>(windowWidth);
 	_viewport.Height = static_cast<float>(windowHeight);
 	_viewport.TopLeftX = 0;
@@ -171,7 +172,7 @@ D3D12Environment::InitializeDXGIDevice(HWND hWnd)
 	};
 
 	// ノートPC用にNVIDIAのグラフィックスを優先して検出
-	ComPtr<IDXGIAdapter> adapter = FindDXGIAdapter(L"NVIDIA");
+	Microsoft::WRL::ComPtr<IDXGIAdapter> adapter = FindDXGIAdapter(L"NVIDIA");
 	for (auto lv : levels) {
 		if (D3D12CreateDevice(adapter.Get(), lv, IID_PPV_ARGS(_device.ReleaseAndGetAddressOf())) == S_OK) {
 			_featureLevel = lv;

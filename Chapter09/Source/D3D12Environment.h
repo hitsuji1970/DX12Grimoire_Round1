@@ -17,10 +17,6 @@
  */
 class D3D12Environment
 {
-private:
-	/** Microsoft::WRL::ComPtrの型名を短縮 */
-	template<typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
 public:
 	D3D12Environment();
 	virtual ~D3D12Environment();
@@ -33,46 +29,46 @@ public:
 	void EndDraw();
 
 	// DirectXインターフェイスの取得
-	const ComPtr<ID3D12Device>& GetDevice() const
+	const Microsoft::WRL::ComPtr<ID3D12Device>& GetDevice() const
 	{
 		return _device;
 	}
 
-	const ComPtr<ID3D12GraphicsCommandList> GetCommandList() const
+	const Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> GetCommandList() const
 	{
 		return _commandList;
 	}
 
 private:
 	// ディスプレイアダプターのインターフェイス
-	ComPtr<IDXGIFactory4> _dxgiFactory;
-	ComPtr<IDXGISwapChain3> _swapChain;
+	Microsoft::WRL::ComPtr<IDXGIFactory4> _dxgiFactory;
+	Microsoft::WRL::ComPtr<IDXGISwapChain3> _swapChain;
 
 	// DirectXデバイスインターフェイス
-	ComPtr<ID3D12Device> _device;
+	Microsoft::WRL::ComPtr<ID3D12Device> _device;
 
 	// ディスプレイアダプターがサポートしている機能レベル
 	D3D_FEATURE_LEVEL _featureLevel;
 
 	// フレームバッファー
-	ComPtr<ID3D12DescriptorHeap> _rtvHeaps = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _rtvHeaps = nullptr;
 	std::vector<ID3D12Resource*> _backBuffers;
 
 	// 深度バッファー
-	ComPtr<ID3D12DescriptorHeap> _dsvHeap = nullptr;
-	ComPtr<ID3D12Resource> _depthBuffer = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _dsvHeap = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> _depthBuffer = nullptr;
 
 	// コマンドアロケーター: コマンドの実体を格納するメモリーのインターフェイス
-	ComPtr<ID3D12CommandAllocator> _commandAllocator;
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> _commandAllocator;
 
 	// コマンドリスト
-	ComPtr<ID3D12GraphicsCommandList> _commandList;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> _commandList;
 
 	// コマンドキュー
-	ComPtr<ID3D12CommandQueue> _commandQueue;
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue> _commandQueue;
 
 	// フェンス
-	ComPtr<ID3D12Fence> _fence;
+	Microsoft::WRL::ComPtr<ID3D12Fence> _fence;
 	UINT64 _fenceVal;
 
 	// ビューポート

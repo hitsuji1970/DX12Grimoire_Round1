@@ -11,13 +11,15 @@
     <Filter Include="Shader">
       <UniqueIdentifier>{68599c3d-1405-4066-b6c6-c459aca8b4c2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="D3D12">
+      <UniqueIdentifier>{ede7268b-f722-48d8-a159-a0f5b7cd5dc4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\PMDMaterial.cpp">
       <Filter>PMD</Filter>
     </ClCompile>
     <ClCompile Include="Source\Application.cpp" />
-    <ClCompile Include="Source\D3D12Environment.cpp" />
     <ClCompile Include="Source\main.cpp" />
     <ClCompile Include="Source\utils.cpp" />
     <ClCompile Include="Source\PMDRenderer.cpp">
@@ -26,19 +28,30 @@
     <ClCompile Include="Source\PMDActor.cpp">
       <Filter>PMD</Filter>
     </ClCompile>
+    <ClCompile Include="Source\D3D12Environment.cpp">
+      <Filter>D3D12</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\D3D12ResourceCache.cpp">
+      <Filter>D3D12</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\PMDMaterial.h">
       <Filter>PMD</Filter>
     </ClInclude>
     <ClInclude Include="Source\Application.h" />
-    <ClInclude Include="Source\D3D12Environment.h" />
     <ClInclude Include="Source\utils.h" />
     <ClInclude Include="Source\PMDRenderer.h">
       <Filter>PMD</Filter>
     </ClInclude>
     <ClInclude Include="Source\PMDActor.h">
       <Filter>PMD</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\D3D12Environment.h">
+      <Filter>D3D12</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\D3D12ResourceCache.h">
+      <Filter>D3D12</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

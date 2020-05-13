@@ -152,6 +152,7 @@
     <ClCompile Include="Source\PMDActor.cpp" />
     <ClCompile Include="Source\PMDMaterial.cpp" />
     <ClCompile Include="Source\PMDRenderer.cpp" />
+    <ClCompile Include="Source\D3D12ResourceCache.cpp" />
     <ClCompile Include="Source\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -160,6 +161,7 @@
     <ClInclude Include="Source\PMDActor.h" />
     <ClInclude Include="Source\PMDMaterial.h" />
     <ClInclude Include="Source\PMDRenderer.h" />
+    <ClInclude Include="Source\D3D12ResourceCache.h" />
     <ClInclude Include="Source\utils.h" />
   </ItemGroup>
   <ItemGroup>

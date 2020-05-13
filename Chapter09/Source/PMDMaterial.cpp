@@ -72,7 +72,7 @@ namespace pmd
 	 * ファイルから読み込んだシリアライズ済みデータを展開
 	 */
 	HRESULT PMDMaterial::LoadFromSerializedData(
-		ID3D12Device* const pD3D12Device,
+		D3D12ResourceCache* const pResourceCache,
 		const SerializedMaterialData& serializedData,
 		const std::wstring& folderPath,
 		const std::wstring& toonTexturePath
@@ -96,13 +96,13 @@ namespace pmd
 				auto path = folderPath + L'/' + filename;
 				auto ext = ::GetExtension(filename);
 				if (ext == L"sph") {
-					pSPHResource = LoadTextureFromFile(pD3D12Device, path);
+					pSPHResource = pResourceCache->LoadTextureFromFile(path);
 				}
 				else if (ext == L"spa") {
-					pSPAResource = LoadTextureFromFile(pD3D12Device, path);
+					pSPAResource = pResourceCache->LoadTextureFromFile(path);
 				}
 				else {
-					pTextureResource = LoadTextureFromFile(pD3D12Device, path);
+					pTextureResource = pResourceCache->LoadTextureFromFile(path);
 				}
 			}
 #ifdef _DEBUG
@@ -117,7 +117,7 @@ namespace pmd
 
 		wchar_t toonFileName[16];
 		swprintf_s(toonFileName, L"/toon%02d.bmp", serializedData.toonIdx + 1);
-		pToonResource = LoadTextureFromFile(pD3D12Device, toonTexturePath + toonFileName);
+		pToonResource = pResourceCache->LoadTextureFromFile(toonTexturePath + toonFileName);
 
 		return result;
 	}
@@ -179,93 +179,5 @@ namespace pmd
 			pD3D12Device->CreateShaderResourceView(TheGradTexture.Get(), pSRVDesc, *pDescriptorHandle);
 		}
 		pDescriptorHandle->ptr += incSize;
-	}
-
-	/**
-	 * テクスチャーをファイルからロード
-	 */
-	ID3D12Resource* PMDMaterial::LoadTextureFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename)
-	{
-		auto it = SharedResources.find(filename);
-		if (it != SharedResources.end()) {
-			return it->second.Get();
-		}
-
-		using TexMetadata = DirectX::TexMetadata;
-		using ScratchImage = DirectX::ScratchImage;
-
-		TexMetadata metadata = {};
-		ScratchImage scratchImg = {};
-		HRESULT result;
-
-		// テクスチャー読み込み関数テーブル
-		using loader_t = std::function<HRESULT(const std::wstring& path, TexMetadata*, ScratchImage&)>;
-		std::map<std::wstring, loader_t> loadLambdaTable;
-		loadLambdaTable[L"sph"]
-			= loadLambdaTable[L"spa"]
-			= loadLambdaTable[L"bmp"]
-			= loadLambdaTable[L"png"]
-			= loadLambdaTable[L"jpg"]
-			= [](const std::wstring& path, TexMetadata* meta, ScratchImage& img)
-			-> HRESULT
-		{
-			return LoadFromWICFile(path.c_str(), DirectX::WIC_FLAGS_NONE, meta, img);
-		};
-
-		loadLambdaTable[L"tga"]
-			= [](const std::wstring& path, TexMetadata* meta, ScratchImage& img)
-			-> HRESULT
-		{
-			return LoadFromTGAFile(path.c_str(), meta, img);
-		};
-
-		loadLambdaTable[L"dds"]
-			= [](const std::wstring& path, TexMetadata* meta, ScratchImage& img)
-			-> HRESULT
-		{
-			return LoadFromDDSFile(path.c_str(), 0, meta, img);
-		};
-
-		// 読み込み
-		auto ext = GetExtension(filename);
-		result = loadLambdaTable[ext](filename, &metadata, scratchImg);
-		if (FAILED(result))
-		{
-			wprintf(L"load failed. : %s\n", filename.c_str());
-			return nullptr;
-		}
-
-		auto img = scratchImg.GetImage(0, 0, 0);
-		auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_CPU_PAGE_PROPERTY_WRITE_BACK, D3D12_MEMORY_POOL_L0);
-		auto resDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-			metadata.format, metadata.width, static_cast<UINT>(metadata.height),
-			static_cast<UINT16>(metadata.arraySize), static_cast<UINT16>(metadata.mipLevels));
-
-		ID3D12Resource* pTextureResource = nullptr;
-		result = pD3D12Device->CreateCommittedResource(
-			&heapProp, D3D12_HEAP_FLAG_NONE,
-			&resDesc, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-			nullptr, IID_PPV_ARGS(&pTextureResource)
-		);
-
-		if (FAILED(result))
-		{
-			wprintf(L"failed to create resource : %s\n", filename.c_str());
-			return nullptr;
-		}
-
-		auto rowPitch = static_cast<UINT>(img->rowPitch);
-		auto slicePitch = static_cast<UINT>(img->slicePitch);
-		result = pTextureResource->WriteToSubresource(0, nullptr, img->pixels, rowPitch, slicePitch);
-		if (FAILED(result))
-		{
-			wprintf(L"failed to create resource : %s\n", filename.c_str());
-			return nullptr;
-		}
-
-		SharedResources.emplace(filename, pTextureResource);
-
-		pTextureResource->SetName(filename.c_str());
-		return pTextureResource;
 	}
 }

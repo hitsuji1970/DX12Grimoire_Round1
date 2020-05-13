@@ -70,7 +70,11 @@ namespace pmd
 	}
 
 	// PMDファイルからの読み込み
-	HRESULT PMDActor::LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename, const std::wstring& toonTexturePath)
+	HRESULT PMDActor::LoadFromFile(
+		ID3D12Device* const pD3D12Device,
+		D3D12ResourceCache* const pResourceCache,
+		const std::wstring& filename,
+		const std::wstring& toonTexturePath)
 	{
 		HRESULT result;
 		FILE* fp = nullptr;
@@ -125,7 +129,7 @@ namespace pmd
 
 		m_materials.resize(numberOfMaterial);
 		for (int i = 0; i < serializedMaterials.size(); i++) {
-			m_materials[i].LoadFromSerializedData(pD3D12Device, serializedMaterials[i], folderPath, toonTexturePath);
+			m_materials[i].LoadFromSerializedData(pResourceCache, serializedMaterials[i], folderPath, toonTexturePath);
 #ifdef _DEBUG
 			wprintf(L"material[%d]:", i);
 #endif // _DEBUG

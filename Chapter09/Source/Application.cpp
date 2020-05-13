@@ -42,10 +42,19 @@ Application::Initialize()
 		return E_FAIL;
 	}
 
+	// Direct3D12描画環境の初期化
 	_d3d12Env.reset(new D3D12Environment());
-	_d3d12Env->Initialize(_hWnd, DefaultWindowWidth, DefaultWindowHeight);
+	result = _d3d12Env->Initialize(_hWnd, DefaultWindowWidth, DefaultWindowHeight);
+	if (FAILED(result))
+	{
+		return result;
+	}
 	auto pDevice = _d3d12Env->GetDevice();
 
+	// リソースキャッシュ
+	_resourceCache.reset(new D3D12ResourceCache(pDevice.Get()));
+
+	// ウィンドウの表示を開始
 	ShowWindow(_hWnd, SW_SHOW);
 
 	// 定数バッファー
@@ -83,7 +92,7 @@ Application::Initialize()
 	_pmdActor.reset(new pmd::PMDActor());
 
 	result = pmd::PMDMaterial::LoadDefaultTextures(pDevice.Get());
-	result = _pmdActor->LoadFromFile(pDevice.Get(), ModelPath + L"/初音ミク.pmd", ToonBmpPath);
+	result = _pmdActor->LoadFromFile(pDevice.Get(), _resourceCache.get(), ModelPath + L"/初音ミク.pmd", ToonBmpPath);
 	//result = mesh.LoadFromFile(_device, ModelPath + L"/初音ミクmetal.pmd");
 	//result = mesh.LoadFromFile(_device, ModelPath + L"/巡音ルカ.pmd");
 

@@ -13,6 +13,7 @@
 #include <d3d12.h>
 #include <DirectXMath.h>
 
+#include "D3D12ResourceCache.h"
 #include "PMDMaterial.h"
 
 namespace pmd
@@ -47,7 +48,11 @@ namespace pmd
 		PMDActor();
 		virtual ~PMDActor();
 
-		HRESULT LoadFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename, const std::wstring& toonTexturePath);
+		HRESULT LoadFromFile(
+			ID3D12Device* const pD3D12Device,
+			D3D12ResourceCache* const resourceCache,
+			const std::wstring& filename,
+			const std::wstring& toonTexturePath);
 
 		void Draw(ID3D12Device* const pD3D12Device, ID3D12GraphicsCommandList* const pCommandList);
 

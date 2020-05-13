@@ -4,6 +4,7 @@
 #include <wrl.h>
 
 #include "D3D12Environment.h"
+#include "D3D12ResourceCache.h"
 #include "PMDActor.h"
 #include "PMDRenderer.h"
 
@@ -19,10 +20,6 @@ struct SceneMatrix
 
 class Application
 {
-private:
-	/** Microsoft::WRL::ComPtrの型名を短縮 */
-	template<typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
 public:
 	// 定数
 	static constexpr LONG DefaultWindowWidth = 1280;
@@ -54,17 +51,19 @@ private:
 	// ウィンドウクラス
 	WNDCLASSEX _wndClass;
 
-	// DirectX 12描画環境
+	// DirectX12描画環境
 	std::unique_ptr<D3D12Environment> _d3d12Env;
 
-	ComPtr<ID3D12DescriptorHeap> _basicDescHeap;
-	ComPtr<ID3D12Resource> _constBuff;
+	// DirectX12リソースキャッシュ
+	std::unique_ptr<D3D12ResourceCache> _resourceCache;
+
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _basicDescHeap;
+	Microsoft::WRL::ComPtr<ID3D12Resource> _constBuff;
 	SceneMatrix* _mappedMatrix;
 
 	// PMDモデル描画オブジェクト
 	std::unique_ptr<pmd::PMDRenderer> _pmdRenderer;
 	std::unique_ptr<pmd::PMDActor> _pmdActor;
-
 
 private:
 	// ウィンドウの初期化

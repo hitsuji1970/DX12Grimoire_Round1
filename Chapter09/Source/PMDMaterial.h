@@ -6,6 +6,8 @@
 #include <string>
 #include <map>
 
+#include "D3D12ResourceCache.h"
+
 namespace pmd
 {
 	// PMDマテリアル構造体
@@ -58,7 +60,7 @@ namespace pmd
 
 		/** ファイルから読み込んだシリアライズ済みデータの展開 */
 		HRESULT LoadFromSerializedData(
-			ID3D12Device* const pD3D12Device,
+			D3D12ResourceCache* const pResourceCache,
 			const SerializedMaterialData& serealizedData,
 			const std::wstring& folderPath,
 			const std::wstring& toonTexturePath);
@@ -101,10 +103,6 @@ namespace pmd
 		Microsoft::WRL::ComPtr<ID3D12Resource> pSPHResource;
 		Microsoft::WRL::ComPtr<ID3D12Resource> pSPAResource;
 		Microsoft::WRL::ComPtr<ID3D12Resource> pToonResource;
-
-	private:
-		// テクスチャーをファイルからロード
-		ID3D12Resource* LoadTextureFromFile(ID3D12Device* const pD3D12Device, const std::wstring& filename);
 	};
 }
 
