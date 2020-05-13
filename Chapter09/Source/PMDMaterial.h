@@ -92,9 +92,6 @@ namespace pmd
 		// 白黒のグラデーションテクスチャー
 		static Microsoft::WRL::ComPtr<ID3D12Resource> TheGradTexture;
 
-		// 共有リソース
-		static std::map<std::wstring, Microsoft::WRL::ComPtr<ID3D12Resource>> SharedResources;
-
 	private:
 		UINT indicesNum;
 		BasicMaterial basicMaterial;

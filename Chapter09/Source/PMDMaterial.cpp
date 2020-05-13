@@ -12,7 +12,6 @@ namespace pmd
 	ComPtr<ID3D12Resource> PMDMaterial::TheWhiteTexture;
 	ComPtr<ID3D12Resource> PMDMaterial::TheBlackTexture;
 	ComPtr<ID3D12Resource> PMDMaterial::TheGradTexture;
-	std::map<std::wstring, ComPtr<ID3D12Resource>> PMDMaterial::SharedResources;
 
 	/**
 	 * コンストラクター
@@ -63,9 +62,6 @@ namespace pmd
 		TheWhiteTexture->Release();
 		TheBlackTexture->Release();
 		TheGradTexture->Release();
-		for (auto res : SharedResources) {
-			res.second->Release();
-		}
 	}
 
 	/**
