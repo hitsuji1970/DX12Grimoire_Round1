@@ -1,4 +1,4 @@
-﻿#include "PMDMaterial.h"
+﻿#include "PMDMesh.h"
 
 #include <d3dx12.h>
 #include <DirectXTex.h>
@@ -9,14 +9,14 @@ namespace pmd
 {
 	template<typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
-	ComPtr<ID3D12Resource> PMDMaterial::TheWhiteTexture;
-	ComPtr<ID3D12Resource> PMDMaterial::TheBlackTexture;
-	ComPtr<ID3D12Resource> PMDMaterial::TheGradTexture;
+	ComPtr<ID3D12Resource> PMDMesh::TheWhiteTexture;
+	ComPtr<ID3D12Resource> PMDMesh::TheBlackTexture;
+	ComPtr<ID3D12Resource> PMDMesh::TheGradTexture;
 
 	/**
 	 * コンストラクター
 	 */
-	PMDMaterial::PMDMaterial() :
+	PMDMesh::PMDMesh() :
 		indicesNum(0), basicMaterial(), additionalMaterial(),
 		pTextureResource(nullptr), pSPHResource(nullptr), pSPAResource(nullptr),
 		pToonResource(nullptr)
@@ -27,14 +27,14 @@ namespace pmd
 	/**
 	 * デストラクター
 	 */
-	PMDMaterial::~PMDMaterial()
+	PMDMesh::~PMDMesh()
 	{
 	}
 
 	/**
 	 * 指定が無い場合に適用する加算・乗算テクスチャーのロード
 	 */
-	HRESULT PMDMaterial::LoadDefaultTextures(ID3D12Device* pD3D12Device)
+	HRESULT PMDMesh::LoadDefaultTextures(ID3D12Device* pD3D12Device)
 	{
 		TheWhiteTexture = CreateSingleColorTexture(pD3D12Device, 0xff, 0xff, 0xff, 0xff);
 		if (TheWhiteTexture == nullptr) {
@@ -57,7 +57,7 @@ namespace pmd
 		return S_OK;
 	}
 
-	void PMDMaterial::ReleaseDefaultTextures()
+	void PMDMesh::ReleaseDefaultTextures()
 	{
 		TheWhiteTexture->Release();
 		TheBlackTexture->Release();
@@ -67,9 +67,9 @@ namespace pmd
 	/**
 	 * ファイルから読み込んだシリアライズ済みデータを展開
 	 */
-	HRESULT PMDMaterial::LoadFromSerializedData(
+	HRESULT PMDMesh::LoadFromSerializedData(
 		D3D12ResourceCache* const pResourceCache,
-		const SerializedMaterialData& serializedData,
+		const SerializedMeshData& serializedData,
 		const std::wstring& folderPath,
 		const std::wstring& toonTexturePath
 	) {
@@ -118,61 +118,59 @@ namespace pmd
 		return result;
 	}
 
-	void PMDMaterial::CreateTextureBuffers(
+	void PMDMesh::CreateTextureBuffers(
 		ID3D12Device* pD3D12Device,
-		D3D12_SHADER_RESOURCE_VIEW_DESC* const pSRVDesc,
-		D3D12_CPU_DESCRIPTOR_HANDLE* const pDescriptorHandle,
-		UINT incSize
+		D3D12_CPU_DESCRIPTOR_HANDLE* const pDescriptorHandle
 	) {
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+		srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = 1;
+
+		auto incSize = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
 		// ディフューズ色テクスチャー
-		if (pTextureResource)
-		{
-			pSRVDesc->Format = pTextureResource->GetDesc().Format;
-			pD3D12Device->CreateShaderResourceView(pTextureResource.Get(), pSRVDesc, *pDescriptorHandle);
+		if (pTextureResource) {
+			srvDesc.Format = pTextureResource->GetDesc().Format;
+			pD3D12Device->CreateShaderResourceView(pTextureResource.Get(), &srvDesc, *pDescriptorHandle);
 		}
-		else
-		{
-			pSRVDesc->Format = TheWhiteTexture->GetDesc().Format;
-			pD3D12Device->CreateShaderResourceView(TheWhiteTexture.Get(), pSRVDesc, *pDescriptorHandle);
+		else {
+			srvDesc.Format = TheWhiteTexture->GetDesc().Format;
+			pD3D12Device->CreateShaderResourceView(TheWhiteTexture.Get(), &srvDesc, *pDescriptorHandle);
 		}
 		pDescriptorHandle->ptr += incSize;
 
 		// 乗算スフィアマップテクスチャー
-		if (pSPHResource)
-		{
-			pSRVDesc->Format = pSPHResource->GetDesc().Format;
-			pD3D12Device->CreateShaderResourceView(pSPHResource.Get(), pSRVDesc, *pDescriptorHandle);
+		if (pSPHResource) {
+			srvDesc.Format = pSPHResource->GetDesc().Format;
+			pD3D12Device->CreateShaderResourceView(pSPHResource.Get(), &srvDesc, *pDescriptorHandle);
 		}
-		else
-		{
-			pSRVDesc->Format = TheWhiteTexture->GetDesc().Format;
-			pD3D12Device->CreateShaderResourceView(TheWhiteTexture.Get(), pSRVDesc, *pDescriptorHandle);
+		else {
+			srvDesc.Format = TheWhiteTexture->GetDesc().Format;
+			pD3D12Device->CreateShaderResourceView(TheWhiteTexture.Get(), &srvDesc, *pDescriptorHandle);
 		}
 		pDescriptorHandle->ptr += incSize;
 
 		// 加算スフィアマップテクスチャー
-		if (pSPAResource)
-		{
-			pSRVDesc->Format = pSPAResource->GetDesc().Format;
-			pD3D12Device->CreateShaderResourceView(pSPAResource.Get(), pSRVDesc, *pDescriptorHandle);
+		if (pSPAResource) {
+			srvDesc.Format = pSPAResource->GetDesc().Format;
+			pD3D12Device->CreateShaderResourceView(pSPAResource.Get(), &srvDesc, *pDescriptorHandle);
 		}
-		else
-		{
-			pSRVDesc->Format = TheBlackTexture->GetDesc().Format;
-			pD3D12Device->CreateShaderResourceView(TheBlackTexture.Get(), pSRVDesc, *pDescriptorHandle);
+		else {
+			srvDesc.Format = TheBlackTexture->GetDesc().Format;
+			pD3D12Device->CreateShaderResourceView(TheBlackTexture.Get(), &srvDesc, *pDescriptorHandle);
 		}
 		pDescriptorHandle->ptr += incSize;
 
 		// トゥーンテクスチャー
-		if (pToonResource)
-		{
-			pSRVDesc->Format = pToonResource->GetDesc().Format;
-			pD3D12Device->CreateShaderResourceView(pToonResource.Get(), pSRVDesc, *pDescriptorHandle);
+		if (pToonResource) {
+			srvDesc.Format = pToonResource->GetDesc().Format;
+			pD3D12Device->CreateShaderResourceView(pToonResource.Get(), &srvDesc, *pDescriptorHandle);
 		}
-		else
-		{
-			pSRVDesc->Format = TheGradTexture->GetDesc().Format;
-			pD3D12Device->CreateShaderResourceView(TheGradTexture.Get(), pSRVDesc, *pDescriptorHandle);
+		else {
+			srvDesc.Format = TheGradTexture->GetDesc().Format;
+			pD3D12Device->CreateShaderResourceView(TheGradTexture.Get(), &srvDesc, *pDescriptorHandle);
 		}
 		pDescriptorHandle->ptr += incSize;
 	}

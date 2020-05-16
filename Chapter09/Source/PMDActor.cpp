@@ -66,7 +66,7 @@ namespace pmd
 		_pmdSignature{}, _pmdHeader(),
 		_vertexBuffer(nullptr), _vertexBufferView{},
 		_indexBuffer(nullptr), _indexBufferView{},
-		_materialBuffer(nullptr), _materialDescHeap(nullptr), _materials{},
+		_materialBuffer(nullptr), _materialDescHeap(nullptr), _meshes{},
 		_transformBuff(nullptr), _transformDescHeap(nullptr), _mappedTransform(nullptr),
 		_angle(0.0f)
 	{
@@ -132,23 +132,23 @@ namespace pmd
 			return result;
 		}
 
-		// マテリアルの読み込み
-		unsigned int numberOfMaterial;
-		fread(&numberOfMaterial, sizeof(numberOfMaterial), 1, fp);
-		std::vector<SerializedMaterialData> serializedMaterials(numberOfMaterial);
-		fread(serializedMaterials.data(), serializedMaterials.size() * sizeof(SerializedMaterialData), 1, fp);
+		// メッシュ情報の読み込み
+		unsigned int numberOfMesh;
+		fread(&numberOfMesh, sizeof(numberOfMesh), 1, fp);
+		std::vector<SerializedMeshData> serializedMeshes(numberOfMesh);
+		fread(serializedMeshes.data(), serializedMeshes.size() * sizeof(SerializedMeshData), 1, fp);
 		std::fclose(fp);
 
-		_materials.resize(numberOfMaterial);
-		for (int i = 0; i < serializedMaterials.size(); i++) {
-			_materials[i].LoadFromSerializedData(pResourceCache, serializedMaterials[i], folderPath, toonTexturePath);
+		_meshes.resize(numberOfMesh);
+		for (int i = 0; i < serializedMeshes.size(); i++) {
+			_meshes[i].LoadFromSerializedData(pResourceCache, serializedMeshes[i], folderPath, toonTexturePath);
 #ifdef _DEBUG
 			wprintf(L"material[%d]:", i);
 #endif // _DEBUG
 		}
 
 		// マテリアルのバッファーを作成
-		result = CreateMaterialBuffers(pD3D12Device, numberOfMaterial, serializedMaterials);
+		result = CreateMaterialBuffers(pD3D12Device, numberOfMesh, serializedMeshes);
 
 		// 変換行列の定数バッファー
 		result = pD3D12Device->CreateCommittedResource(
@@ -190,39 +190,6 @@ namespace pmd
 		m_loadedModelPath = filename;
 
 		return S_OK;
-	}
-
-	// フレーム更新
-	void PMDActor::Update()
-	{
-		_angle += 0.01f;
-		_mappedTransform->world = DirectX::XMMatrixRotationY(_angle);
-	}
-
-	// 描画
-	void PMDActor::Draw(ID3D12Device* const pD3D12Device, ID3D12GraphicsCommandList* const pCommandList)
-	{
-		ID3D12DescriptorHeap* descHeaps[] = { _transformDescHeap.Get() };
-		pCommandList->SetDescriptorHeaps(1, descHeaps);
-		pCommandList->SetGraphicsRootDescriptorTable(1, _transformDescHeap->GetGPUDescriptorHandleForHeapStart());
-
-		pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		pCommandList->IASetVertexBuffers(0, 1, &_vertexBufferView);
-		pCommandList->IASetIndexBuffer(&_indexBufferView);
-
-		ID3D12DescriptorHeap* materialDescHeap[] = { _materialDescHeap.Get() };
-		pCommandList->SetDescriptorHeaps(1, materialDescHeap);
-
-		auto gpuDescHandle = materialDescHeap[0]->GetGPUDescriptorHandleForHeapStart();
-		auto handleIncSize = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		handleIncSize *= (1 + pmd::PMDActor::NUMBER_OF_TEXTURE);
-		unsigned int idxOffset = 0;
-		for (const auto& material : _materials) {
-			pCommandList->SetGraphicsRootDescriptorTable(2, gpuDescHandle);
-			pCommandList->DrawIndexedInstanced(material.GetIndicesNum(), 1, idxOffset, 0, 0);
-			gpuDescHandle.ptr += handleIncSize;
-			idxOffset += material.GetIndicesNum();
-		}
 	}
 
 	// 頂点バッファーの作成
@@ -288,8 +255,8 @@ namespace pmd
 	// マテリアルバッファーの作成
 	HRESULT PMDActor::CreateMaterialBuffers(
 		ID3D12Device* const pD3D12Device,
-		unsigned int numberOfMaterial,
-		const std::vector<SerializedMaterialData>& serializedMaterials
+		unsigned int numberOfMesh,
+		const std::vector<SerializedMeshData>& serializedMaterials
 	) {
 		HRESULT result;
 		auto materialBufferSize = sizeof(BasicMaterial);
@@ -297,7 +264,7 @@ namespace pmd
 		result = pD3D12Device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(materialBufferSize * numberOfMaterial),
+			&CD3DX12_RESOURCE_DESC::Buffer(materialBufferSize * numberOfMesh),
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr, IID_PPV_ARGS(_materialBuffer.ReleaseAndGetAddressOf())
 		);
@@ -307,8 +274,8 @@ namespace pmd
 
 		unsigned char* pMappedMaterial = nullptr;
 		result = _materialBuffer->Map(0, nullptr, (void**)&pMappedMaterial);
-		for (auto& material : _materials) {
-			*reinterpret_cast<BasicMaterial*>(pMappedMaterial) = material.GetBasicMaterial();
+		for (auto& mesh : _meshes) {
+			*reinterpret_cast<BasicMaterial*>(pMappedMaterial) = mesh.GetBasicMaterial();
 			pMappedMaterial += materialBufferSize;
 		}
 		_materialBuffer->Unmap(0, nullptr);
@@ -317,7 +284,7 @@ namespace pmd
 		D3D12_DESCRIPTOR_HEAP_DESC matDescHeapDesc = {};
 		matDescHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		matDescHeapDesc.NodeMask = 0;
-		matDescHeapDesc.NumDescriptors = numberOfMaterial * (1 + NUMBER_OF_TEXTURE);
+		matDescHeapDesc.NumDescriptors = numberOfMesh * (1 + NUMBER_OF_TEXTURE);
 		matDescHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		result = pD3D12Device->CreateDescriptorHeap(&matDescHeapDesc, IID_PPV_ARGS(_materialDescHeap.ReleaseAndGetAddressOf()));
 		if (FAILED(result)) {
@@ -328,22 +295,49 @@ namespace pmd
 		matCBVDesc.BufferLocation = _materialBuffer->GetGPUVirtualAddress();
 		matCBVDesc.SizeInBytes = static_cast<UINT>(materialBufferSize);
 
-		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-		srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-		srvDesc.Texture2D.MipLevels = 1;
-
 		auto matDescHeapH = _materialDescHeap->GetCPUDescriptorHandleForHeapStart();
 		auto incSize = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		for (auto i = 0u; i < numberOfMaterial; i++) {
+		for (auto i = 0u; i < numberOfMesh; i++) {
 			pD3D12Device->CreateConstantBufferView(&matCBVDesc, matDescHeapH);
 			matCBVDesc.BufferLocation += materialBufferSize;
 			matDescHeapH.ptr += incSize;
-			_materials[i].CreateTextureBuffers(pD3D12Device, &srvDesc, &matDescHeapH, incSize);
+			_meshes[i].CreateTextureBuffers(pD3D12Device, &matDescHeapH);
 		}
 
 		return S_OK;
+	}
+
+	// フレーム更新
+	void PMDActor::Update()
+	{
+		_angle += 0.01f;
+		_mappedTransform->world = DirectX::XMMatrixRotationY(_angle);
+	}
+
+	// 描画
+	void PMDActor::Draw(ID3D12Device* const pD3D12Device, ID3D12GraphicsCommandList* const pCommandList)
+	{
+		ID3D12DescriptorHeap* descHeaps[] = { _transformDescHeap.Get() };
+		pCommandList->SetDescriptorHeaps(1, descHeaps);
+		pCommandList->SetGraphicsRootDescriptorTable(1, _transformDescHeap->GetGPUDescriptorHandleForHeapStart());
+
+		pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		pCommandList->IASetVertexBuffers(0, 1, &_vertexBufferView);
+		pCommandList->IASetIndexBuffer(&_indexBufferView);
+
+		ID3D12DescriptorHeap* materialDescHeap[] = { _materialDescHeap.Get() };
+		pCommandList->SetDescriptorHeaps(1, materialDescHeap);
+
+		auto gpuDescHandle = materialDescHeap[0]->GetGPUDescriptorHandleForHeapStart();
+		auto handleIncSize = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		handleIncSize *= (1 + pmd::PMDActor::NUMBER_OF_TEXTURE);
+		unsigned int idxOffset = 0;
+		for (const auto& mesh : _meshes) {
+			pCommandList->SetGraphicsRootDescriptorTable(2, gpuDescHandle);
+			pCommandList->DrawIndexedInstanced(mesh.GetIndicesNum(), 1, idxOffset, 0, 0);
+			gpuDescHandle.ptr += handleIncSize;
+			idxOffset += mesh.GetIndicesNum();
+		}
 	}
 
 } // namespace pmd

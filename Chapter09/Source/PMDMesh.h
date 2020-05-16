@@ -10,9 +10,9 @@
 
 namespace pmd
 {
-	// PMDマテリアル構造体
+	// 描画単位となるメッシュのロード用構造体
 #pragma pack(1)
-	struct SerializedMaterialData
+	struct SerializedMeshData
 	{
 		DirectX::XMFLOAT3 diffuse;
 		float alpha;
@@ -21,12 +21,13 @@ namespace pmd
 		DirectX::XMFLOAT3 ambient;
 		unsigned char toonIdx;
 		unsigned char edgeFlg;
-		// パディング2bytesが入る
+		// 本来はここにパディング2bytesが入る
 		unsigned int indicesNum;
 		char texFilePath[20];
 	};
 #pragma pack()
 
+	// マテリアル情報構造体
 	struct BasicMaterial
 	{
 		// ディフューズ成分
@@ -41,6 +42,7 @@ namespace pmd
 		DirectX::XMFLOAT3 ambient;
 	};
 
+	// 追加のマテリアル情報構造体
 	struct AdditionalMaterial
 	{
 		std::wstring texPath;
@@ -48,35 +50,37 @@ namespace pmd
 		bool edgeFlg;
 	};
 
-	class PMDMaterial
+	// 描画メッシュ単位のデータクラス
+	// インデックス範囲とマテリアルの値を持つ
+	class PMDMesh
 	{
 	public:
-		PMDMaterial();
-		virtual ~PMDMaterial();
+		PMDMesh();
+		virtual ~PMDMesh();
 
 		/** 共通のデフォルトテクスチャーをロード */
 		static HRESULT LoadDefaultTextures(ID3D12Device* const pD3d12Device);
 		static void ReleaseDefaultTextures();
 
-		/** ファイルから読み込んだシリアライズ済みデータの展開 */
+		// ファイルから読み込んだシリアライズ済みデータの展開
 		HRESULT LoadFromSerializedData(
 			D3D12ResourceCache* const pResourceCache,
-			const SerializedMaterialData& serealizedData,
+			const SerializedMeshData& serealizedData,
 			const std::wstring& folderPath,
 			const std::wstring& toonTexturePath);
 
-		/** テクスチャー用バッファーリソースの生成 */
+		// テクスチャー用バッファーリソースの生成
 		void CreateTextureBuffers(
 			ID3D12Device* const pD3D12Device,
-			D3D12_SHADER_RESOURCE_VIEW_DESC* const pSRVDesc,
-			D3D12_CPU_DESCRIPTOR_HANDLE* const pDescriptorHeapHandle,
-			UINT incSize);
+			D3D12_CPU_DESCRIPTOR_HANDLE* const pDescriptorHeapHandle);
 
+		// 描画命令の発効時に参照するインデックス数
 		unsigned int GetIndicesNum() const
 		{
 			return indicesNum;
 		}
 
+		// マテリアル情報の取得
 		const BasicMaterial& GetBasicMaterial() const
 		{
 			return basicMaterial;

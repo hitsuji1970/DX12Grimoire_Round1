@@ -14,7 +14,6 @@
 // User
 #include "D3D12Environment.h"
 #include "utils.h"
-#include "PMDMaterial.h"
 
 // PMDモデルファイル名
 //const std::wstring ModelPath = L"D:/madobe/MMD_DATA/MMD-Nanami/Nanami.pmd";
@@ -93,7 +92,7 @@ Application::Initialize()
 	_pmdRenderer.reset(new pmd::PMDRenderer(_d3d12Env->GetDevice().Get()));
 	_pmdActor.reset(new pmd::PMDActor());
 
-	result = pmd::PMDMaterial::LoadDefaultTextures(pDevice.Get());
+	result = pmd::PMDMesh::LoadDefaultTextures(pDevice.Get());
 	result = _pmdActor->LoadFromFile(pDevice.Get(), _resourceCache.get(), ModelPath, ToonBmpPath);
 
 	return S_OK;
@@ -152,7 +151,7 @@ Application::Run()
 void
 Application::Terminate()
 {
-	pmd::PMDMaterial::ReleaseDefaultTextures();
+	pmd::PMDMesh::ReleaseDefaultTextures();
 
 	ID3D12DebugDevice* debugInterface;
 	if (SUCCEEDED(_d3d12Env->GetDevice()->QueryInterface(&debugInterface)))

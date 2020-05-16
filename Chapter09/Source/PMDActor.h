@@ -14,7 +14,7 @@
 #include <DirectXMath.h>
 
 #include "D3D12ResourceCache.h"
-#include "PMDMaterial.h"
+#include "PMDMesh.h"
 
 namespace pmd
 {
@@ -89,12 +89,10 @@ namespace pmd
 
 		// マテリアルバッファー
 		Microsoft::WRL::ComPtr<ID3D12Resource> _materialBuffer;
-
-		// マテリアル用ディスクリプターヒープ
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _materialDescHeap;
 
-		// マテリアル実体
-		std::vector<PMDMaterial> _materials;
+		// インデックスとマテリアルを参照して描画の単位となるメッシュ
+		std::vector<PMDMesh> _meshes;
 
 		// 変換行列
 		Microsoft::WRL::ComPtr<ID3D12Resource> _transformBuff;
@@ -107,7 +105,7 @@ namespace pmd
 	private:
 		HRESULT CreateVertexBuffer(ID3D12Device* const pD3D12Device, const std::vector<unsigned char>& rawVertices);
 		HRESULT CreateIndexBuffer(ID3D12Device* const pD3D12Device, const std::vector<unsigned short>& rawIndices);
-		HRESULT CreateMaterialBuffers(ID3D12Device* const pD3D12Device, unsigned int numberOfMaterial, const std::vector<SerializedMaterialData>& serializedMaterials);
+		HRESULT CreateMaterialBuffers(ID3D12Device* const pD3D12Device, unsigned int numberOfMesh, const std::vector<SerializedMeshData>& serializedMaterials);
 	};
 
 } // namespace pmd
