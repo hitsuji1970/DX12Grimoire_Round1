@@ -11,7 +11,6 @@
 // シェーダーに渡す行列
 struct SceneMatrix
 {
-	DirectX::XMMATRIX world;
 	DirectX::XMMATRIX view;
 	DirectX::XMMATRIX proj;
 	DirectX::XMMATRIX viewProj;
@@ -29,16 +28,16 @@ public:
 	Application();
 	virtual ~Application();
 
-	/** 初期化処理 */
+	// 初期化処理
 	HRESULT Initialize();
 
-	/** 実行と更新 */
+	// 実行と更新
 	void Run();
 
-	/** 終了処理 */
+	// 終了処理
 	void Terminate();
 
-	/** ウィンドウハンドルの取得 */
+	// ウィンドウハンドルの取得
 	const HWND GetWindowHandle() const
 	{
 		return _hWnd;
@@ -57,8 +56,8 @@ private:
 	// DirectX12リソースキャッシュ
 	std::unique_ptr<D3D12ResourceCache> _resourceCache;
 
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _basicDescHeap;
-	Microsoft::WRL::ComPtr<ID3D12Resource> _constBuff;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _sceneMatrixDescHeap;
+	Microsoft::WRL::ComPtr<ID3D12Resource> _sceneMatrixConstantBuffer;
 	SceneMatrix* _mappedMatrix;
 
 	// PMDモデル描画オブジェクト

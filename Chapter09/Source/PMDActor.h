@@ -36,6 +36,15 @@ namespace pmd
 		unsigned char endflg;
 	};
 
+	// トランスフォーム
+	struct Transform
+	{
+		// XMMATRIX型のメンバーが16バイトアラインメントであるため
+		// Transformのnew()演算子をオーバーライドして16バイト境界に確保する
+		void* operator new(size_t size);
+		DirectX::XMMATRIX world;
+	};
+
 	class PMDActor
 	{
 	public:
@@ -54,6 +63,7 @@ namespace pmd
 			const std::wstring& filename,
 			const std::wstring& toonTexturePath);
 
+		void Update();
 		void Draw(ID3D12Device* const pD3D12Device, ID3D12GraphicsCommandList* const pCommandList);
 
 	private:
@@ -64,27 +74,35 @@ namespace pmd
 		std::wstring m_loadedModelPath;
 
 		// シグネチャー情報
-		char m_signature[3];
+		char _pmdSignature[3];
 
 		// ヘッダー情報
-		PMDHeader m_header;
+		PMDHeader _pmdHeader;
 
 		// 頂点バッファー
-		Microsoft::WRL::ComPtr<ID3D12Resource> m_vertexBuffer;
-		D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
+		Microsoft::WRL::ComPtr<ID3D12Resource> _vertexBuffer;
+		D3D12_VERTEX_BUFFER_VIEW _vertexBufferView;
 
 		// インデックスバッファー
-		Microsoft::WRL::ComPtr<ID3D12Resource> m_indexBuffer;
-		D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
+		Microsoft::WRL::ComPtr<ID3D12Resource> _indexBuffer;
+		D3D12_INDEX_BUFFER_VIEW _indexBufferView;
 
 		// マテリアルバッファー
-		Microsoft::WRL::ComPtr<ID3D12Resource> m_materialBuffer;
+		Microsoft::WRL::ComPtr<ID3D12Resource> _materialBuffer;
 
 		// マテリアル用ディスクリプターヒープ
-		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_materialDescHeap;
+		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _materialDescHeap;
 
 		// マテリアル実体
-		std::vector<PMDMaterial> m_materials;
+		std::vector<PMDMaterial> _materials;
+
+		// 変換行列
+		Microsoft::WRL::ComPtr<ID3D12Resource> _transformBuff;
+		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _transformDescHeap;
+		Transform* _mappedTransform;
+
+		// 動作確認用の回転
+		float _angle;
 
 	private:
 		HRESULT CreateVertexBuffer(ID3D12Device* const pD3D12Device, const std::vector<unsigned char>& rawVertices);

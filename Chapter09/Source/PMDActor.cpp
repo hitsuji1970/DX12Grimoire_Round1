@@ -21,6 +21,12 @@ namespace pmd
 {
 	using namespace Microsoft::WRL;
 
+	// トランスフォームは16Byte境界でnew()
+	void* Transform::operator new(size_t size)
+	{
+		return _aligned_malloc(size, 16);
+	}
+
 	// PMD頂点レイアウト
 	const std::vector<D3D12_INPUT_ELEMENT_DESC> PMDActor::InputLayout = {
 		{ // 座標
@@ -57,16 +63,22 @@ namespace pmd
 
 	// コンストラクター
 	PMDActor::PMDActor() :
-		m_signature{}, m_header(),
-		m_vertexBuffer(nullptr), m_vertexBufferView{},
-		m_indexBuffer(nullptr), m_indexBufferView{},
-		m_materialBuffer(nullptr), m_materialDescHeap(nullptr), m_materials{}
+		_pmdSignature{}, _pmdHeader(),
+		_vertexBuffer(nullptr), _vertexBufferView{},
+		_indexBuffer(nullptr), _indexBufferView{},
+		_materialBuffer(nullptr), _materialDescHeap(nullptr), _materials{},
+		_transformBuff(nullptr), _transformDescHeap(nullptr), _mappedTransform(nullptr),
+		_angle(0.0f)
 	{
 	}
 
 	// デストラクター
 	PMDActor::~PMDActor()
 	{
+		if (_transformBuff && _mappedTransform) {
+			_transformBuff->Unmap(0, nullptr);
+			_mappedTransform = nullptr;
+		}
 	}
 
 	// PMDファイルからの読み込み
@@ -91,8 +103,8 @@ namespace pmd
 		auto folderPath = filename.substr(0, pathIndex);
 
 		// シグネチャーとヘッダー情報
-		std::fread(m_signature, sizeof(m_signature), 1, fp);
-		std::fread(&m_header, sizeof(m_header), 1, fp);
+		std::fread(_pmdSignature, sizeof(_pmdSignature), 1, fp);
+		std::fread(&_pmdHeader, sizeof(_pmdHeader), 1, fp);
 
 		// 頂点データの読み込みと頂点バッファーの生成
 		unsigned int numberOfVertex;
@@ -127,9 +139,9 @@ namespace pmd
 		fread(serializedMaterials.data(), serializedMaterials.size() * sizeof(SerializedMaterialData), 1, fp);
 		std::fclose(fp);
 
-		m_materials.resize(numberOfMaterial);
+		_materials.resize(numberOfMaterial);
 		for (int i = 0; i < serializedMaterials.size(); i++) {
-			m_materials[i].LoadFromSerializedData(pResourceCache, serializedMaterials[i], folderPath, toonTexturePath);
+			_materials[i].LoadFromSerializedData(pResourceCache, serializedMaterials[i], folderPath, toonTexturePath);
 #ifdef _DEBUG
 			wprintf(L"material[%d]:", i);
 #endif // _DEBUG
@@ -137,28 +149,78 @@ namespace pmd
 
 		// マテリアルのバッファーを作成
 		result = CreateMaterialBuffers(pD3D12Device, numberOfMaterial, serializedMaterials);
+
+		// 変換行列の定数バッファー
+		result = pD3D12Device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer((sizeof(Transform) + 0xff) & ~0xff),
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(_transformBuff.ReleaseAndGetAddressOf()));
+		_transformBuff->SetName(L"ConstantBuffer(PMDActor)");
+		if (FAILED(result))
+		{
+			return result;
+		}
+
+		// 変換行列の書き込みマップ
+		result = _transformBuff->Map(0, nullptr, (void**)&_mappedTransform);
+
+		// 変換行列のシェーダーリソースビュー
+		D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
+		descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		descHeapDesc.NodeMask = 0;
+		descHeapDesc.NumDescriptors = 1;
+		descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		result = pD3D12Device->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(_transformDescHeap.ReleaseAndGetAddressOf()));
+		if (FAILED(result))
+		{
+			return result;
+		}
+
+		_transformDescHeap->SetName(L"TransformDescHeap(PMDActor)");
+		auto heapHandle = _transformDescHeap->GetCPUDescriptorHandleForHeapStart();
+		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+		cbvDesc.BufferLocation = _transformBuff->GetGPUVirtualAddress();
+		cbvDesc.SizeInBytes = static_cast<UINT>(_transformBuff->GetDesc().Width);
+		pD3D12Device->CreateConstantBufferView(&cbvDesc, heapHandle);
+
+		// ロードしたモデルのパスを一応保持
 		m_loadedModelPath = filename;
+
 		return S_OK;
+	}
+
+	// フレーム更新
+	void PMDActor::Update()
+	{
+		_angle += 0.01f;
+		_mappedTransform->world = DirectX::XMMatrixRotationY(_angle);
 	}
 
 	// 描画
 	void PMDActor::Draw(ID3D12Device* const pD3D12Device, ID3D12GraphicsCommandList* const pCommandList)
 	{
-		pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		pCommandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-		pCommandList->IASetIndexBuffer(&m_indexBufferView);
+		ID3D12DescriptorHeap* descHeaps[] = { _transformDescHeap.Get() };
+		pCommandList->SetDescriptorHeaps(1, descHeaps);
+		pCommandList->SetGraphicsRootDescriptorTable(1, _transformDescHeap->GetGPUDescriptorHandleForHeapStart());
 
-		ID3D12DescriptorHeap* materialDescHeap[] = { m_materialDescHeap.Get() };
+		pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		pCommandList->IASetVertexBuffers(0, 1, &_vertexBufferView);
+		pCommandList->IASetIndexBuffer(&_indexBufferView);
+
+		ID3D12DescriptorHeap* materialDescHeap[] = { _materialDescHeap.Get() };
 		pCommandList->SetDescriptorHeaps(1, materialDescHeap);
 
-		auto materialH = materialDescHeap[0]->GetGPUDescriptorHandleForHeapStart();
-		auto cbvsrvIncSize = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-		cbvsrvIncSize *= (1 + pmd::PMDActor::NUMBER_OF_TEXTURE);
+		auto gpuDescHandle = materialDescHeap[0]->GetGPUDescriptorHandleForHeapStart();
+		auto handleIncSize = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		handleIncSize *= (1 + pmd::PMDActor::NUMBER_OF_TEXTURE);
 		unsigned int idxOffset = 0;
-		for (const auto& material : m_materials) {
-			pCommandList->SetGraphicsRootDescriptorTable(1, materialH);
+		for (const auto& material : _materials) {
+			pCommandList->SetGraphicsRootDescriptorTable(2, gpuDescHandle);
 			pCommandList->DrawIndexedInstanced(material.GetIndicesNum(), 1, idxOffset, 0, 0);
-			materialH.ptr += cbvsrvIncSize;
+			gpuDescHandle.ptr += handleIncSize;
 			idxOffset += material.GetIndicesNum();
 		}
 	}
@@ -171,24 +233,24 @@ namespace pmd
 		result = pD3D12Device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
 			&CD3DX12_RESOURCE_DESC::Buffer(rawVertices.size() * sizeof(rawVertices[0])), D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr, IID_PPV_ARGS(m_vertexBuffer.ReleaseAndGetAddressOf())
+			nullptr, IID_PPV_ARGS(_vertexBuffer.ReleaseAndGetAddressOf())
 		);
 		if (FAILED(result)) {
 			return result;
 		}
 
 		unsigned char* mappedVertex = nullptr;
-		result = m_vertexBuffer->Map(0, nullptr, (void**)&mappedVertex);
+		result = _vertexBuffer->Map(0, nullptr, (void**)&mappedVertex);
 		if (FAILED(result)) {
 			return result;
 		}
 		std::copy(std::begin(rawVertices), std::end(rawVertices), mappedVertex);
-		m_vertexBuffer->Unmap(0, nullptr);
+		_vertexBuffer->Unmap(0, nullptr);
 		mappedVertex = nullptr;
 
-		m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
-		m_vertexBufferView.SizeInBytes = static_cast<UINT>(rawVertices.size());
-		m_vertexBufferView.StrideInBytes = VERTEX_SIZE;
+		_vertexBufferView.BufferLocation = _vertexBuffer->GetGPUVirtualAddress();
+		_vertexBufferView.SizeInBytes = static_cast<UINT>(rawVertices.size());
+		_vertexBufferView.StrideInBytes = VERTEX_SIZE;
 
 		return S_OK;
 	}
@@ -201,24 +263,24 @@ namespace pmd
 		result = pD3D12Device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), D3D12_HEAP_FLAG_NONE,
 			&CD3DX12_RESOURCE_DESC::Buffer(rawIndices.size() * sizeof(rawIndices[0])), D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr, IID_PPV_ARGS(m_indexBuffer.ReleaseAndGetAddressOf())
+			nullptr, IID_PPV_ARGS(_indexBuffer.ReleaseAndGetAddressOf())
 		);
 		if (FAILED(result)) {
 			return result;
 		}
 
 		unsigned short* mappedIndex = nullptr;
-		result = m_indexBuffer->Map(0, nullptr, (void**)&mappedIndex);
+		result = _indexBuffer->Map(0, nullptr, (void**)&mappedIndex);
 		if (FAILED(result)) {
 			return result;
 		}
 		std::copy(std::begin(rawIndices), std::end(rawIndices), mappedIndex);
-		m_indexBuffer->Unmap(0, nullptr);
+		_indexBuffer->Unmap(0, nullptr);
 		mappedIndex = nullptr;
 
-		m_indexBufferView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
-		m_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
-		m_indexBufferView.SizeInBytes = static_cast<UINT>(rawIndices.size() * sizeof(rawIndices[0]));
+		_indexBufferView.BufferLocation = _indexBuffer->GetGPUVirtualAddress();
+		_indexBufferView.Format = DXGI_FORMAT_R16_UINT;
+		_indexBufferView.SizeInBytes = static_cast<UINT>(rawIndices.size() * sizeof(rawIndices[0]));
 
 		return S_OK;
 	}
@@ -237,31 +299,33 @@ namespace pmd
 			D3D12_HEAP_FLAG_NONE,
 			&CD3DX12_RESOURCE_DESC::Buffer(materialBufferSize * numberOfMaterial),
 			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr, IID_PPV_ARGS(m_materialBuffer.ReleaseAndGetAddressOf())
+			nullptr, IID_PPV_ARGS(_materialBuffer.ReleaseAndGetAddressOf())
 		);
 		if (FAILED(result)) {
 			return result;
 		}
 
 		unsigned char* pMappedMaterial = nullptr;
-		result = m_materialBuffer->Map(0, nullptr, (void**)&pMappedMaterial);
-		for (auto& material : m_materials) {
+		result = _materialBuffer->Map(0, nullptr, (void**)&pMappedMaterial);
+		for (auto& material : _materials) {
 			*reinterpret_cast<BasicMaterial*>(pMappedMaterial) = material.GetBasicMaterial();
 			pMappedMaterial += materialBufferSize;
 		}
+		_materialBuffer->Unmap(0, nullptr);
+		pMappedMaterial = nullptr;
 
 		D3D12_DESCRIPTOR_HEAP_DESC matDescHeapDesc = {};
 		matDescHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		matDescHeapDesc.NodeMask = 0;
 		matDescHeapDesc.NumDescriptors = numberOfMaterial * (1 + NUMBER_OF_TEXTURE);
 		matDescHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		result = pD3D12Device->CreateDescriptorHeap(&matDescHeapDesc, IID_PPV_ARGS(m_materialDescHeap.ReleaseAndGetAddressOf()));
+		result = pD3D12Device->CreateDescriptorHeap(&matDescHeapDesc, IID_PPV_ARGS(_materialDescHeap.ReleaseAndGetAddressOf()));
 		if (FAILED(result)) {
 			return result;
 		}
 
 		D3D12_CONSTANT_BUFFER_VIEW_DESC matCBVDesc = {};
-		matCBVDesc.BufferLocation = m_materialBuffer->GetGPUVirtualAddress();
+		matCBVDesc.BufferLocation = _materialBuffer->GetGPUVirtualAddress();
 		matCBVDesc.SizeInBytes = static_cast<UINT>(materialBufferSize);
 
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -270,13 +334,13 @@ namespace pmd
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 		srvDesc.Texture2D.MipLevels = 1;
 
-		auto matDescHeapH = m_materialDescHeap->GetCPUDescriptorHandleForHeapStart();
+		auto matDescHeapH = _materialDescHeap->GetCPUDescriptorHandleForHeapStart();
 		auto incSize = pD3D12Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		for (auto i = 0u; i < numberOfMaterial; i++) {
 			pD3D12Device->CreateConstantBufferView(&matCBVDesc, matDescHeapH);
 			matCBVDesc.BufferLocation += materialBufferSize;
 			matDescHeapH.ptr += incSize;
-			m_materials[i].CreateTextureBuffers(pD3D12Device, &srvDesc, &matDescHeapH, incSize);
+			_materials[i].CreateTextureBuffers(pD3D12Device, &srvDesc, &matDescHeapH, incSize);
 		}
 
 		return S_OK;

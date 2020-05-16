@@ -115,16 +115,19 @@ namespace pmd
 		HRESULT result;
 
 		// レンジ: テクスチャーと定数の2つ
-		CD3DX12_DESCRIPTOR_RANGE descTblRanges[3] = {};
+		CD3DX12_DESCRIPTOR_RANGE descTblRanges[4] = {};
 		descTblRanges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0); // 定数[b0]: ビュープロジェクション用
-		descTblRanges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1); // 定数[b1]: マテリアル用
-		descTblRanges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 0); // テクスチャー4つ（diffuse, sph, spa, toon）
+		descTblRanges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1); // 定数[b1]: ビュープロジェクション用
+		descTblRanges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 2); // 定数[b2]: マテリアル用
+		descTblRanges[3].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 0); // テクスチャー4つ（diffuse, sph, spa, toon）
 
-		CD3DX12_ROOT_PARAMETER rootParams[2] = {};
+		CD3DX12_ROOT_PARAMETER rootParams[3] = {};
 		// descTableRanges[0]から連続する1つという意味
 		rootParams[0].InitAsDescriptorTable(1, &descTblRanges[0]);
-		// descTableRanges[1]から連続する2つという意味
-		rootParams[1].InitAsDescriptorTable(2, &descTblRanges[1], D3D12_SHADER_VISIBILITY_PIXEL);
+		// descTableRanges[1]から連続する1つという意味
+		rootParams[1].InitAsDescriptorTable(1, &descTblRanges[1]);
+		// descTableRanges[2]から連続する2つという意味
+		rootParams[2].InitAsDescriptorTable(2, &descTblRanges[2], D3D12_SHADER_VISIBILITY_PIXEL);
 
 		// サンプラー設定
 		// slot0:ディフューズ用
@@ -143,9 +146,9 @@ namespace pmd
 		D3D12_ROOT_SIGNATURE_DESC rootsignatureDesc = {};
 		rootsignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 		rootsignatureDesc.pParameters = rootParams;
-		rootsignatureDesc.NumParameters = 2;
+		rootsignatureDesc.NumParameters = sizeof(rootParams) / sizeof(rootParams[0]);
 		rootsignatureDesc.pStaticSamplers = samplerDescs;
-		rootsignatureDesc.NumStaticSamplers = 2;
+		rootsignatureDesc.NumStaticSamplers = sizeof(samplerDescs) / sizeof(samplerDescs[0]);
 
 		ComPtr<ID3DBlob> rootSigBlob = nullptr;
 		ComPtr<ID3DBlob> errorBlob = nullptr;

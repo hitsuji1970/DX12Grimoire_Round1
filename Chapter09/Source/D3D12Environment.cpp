@@ -101,8 +101,6 @@ D3D12Environment::BeginDraw()
 	_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(
 		pBackBuffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-	//commandList->SetPipelineState(_pipelineState.Get());
-
 	auto rtvH = _rtvHeaps->GetCPUDescriptorHandleForHeapStart();
 	auto dsvH = _dsvHeap->GetCPUDescriptorHandleForHeapStart();
 	rtvH.ptr += static_cast<size_t>(bbIdx) * _device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);

@@ -16,14 +16,16 @@
 #include "utils.h"
 #include "PMDMaterial.h"
 
-// モデルデータ読み込みパス
-const std::wstring MMDDataPath = L"D:/MikuMikuDance_v932x64";
-const std::wstring ModelPath = MMDDataPath + L"/UserFile/Model";
-const std::wstring ToonBmpPath = MMDDataPath + L"/Data";
+// PMDモデルファイル名
+//const std::wstring ModelPath = L"D:/madobe/MMD_DATA/MMD-Nanami/Nanami.pmd";
+const std::wstring ModelPath = L"D:/MikuMikuDance_v932x64/UserFile/Model/初音ミク.pmd";
+
+// トゥーンシェーディング用テクスチャー読み込みパス
+const std::wstring ToonBmpPath = L"D:/MikuMikuDance_v932x64/Data";
 
 Application::Application() :
-	_hWnd(nullptr), _wndClass(), _d3d12Env(nullptr), _basicDescHeap(nullptr),
-	_constBuff(nullptr), _mappedMatrix(nullptr), _pmdRenderer(nullptr)
+	_hWnd(nullptr), _wndClass(), _d3d12Env(nullptr), _sceneMatrixDescHeap(nullptr),
+	_sceneMatrixConstantBuffer(nullptr), _mappedMatrix(nullptr), _pmdRenderer(nullptr)
 {
 }
 
@@ -64,11 +66,11 @@ Application::Initialize()
 		&CD3DX12_RESOURCE_DESC::Buffer((sizeof(SceneMatrix) + 0xff) & ~0xff),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
-		IID_PPV_ARGS(_constBuff.ReleaseAndGetAddressOf()));
-	_constBuff->SetName(L"ConstantBuffer");
+		IID_PPV_ARGS(_sceneMatrixConstantBuffer.ReleaseAndGetAddressOf()));
+	_sceneMatrixConstantBuffer->SetName(L"ConstantBuffer");
 
 	// 行列をコピー
-	result = _constBuff->Map(0, nullptr, (void**)&_mappedMatrix);
+	result = _sceneMatrixConstantBuffer->Map(0, nullptr, (void**)&_mappedMatrix);
 
 	// シェーダーリソースビュー
 	D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
@@ -78,23 +80,21 @@ Application::Initialize()
 	// CBV1つ
 	descHeapDesc.NumDescriptors = 1;
 	descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	result = pDevice->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(_basicDescHeap.ReleaseAndGetAddressOf()));
-	_basicDescHeap->SetName(L"BasicDescHeap");
-	auto basicHeapHandle = _basicDescHeap->GetCPUDescriptorHandleForHeapStart();
+	result = pDevice->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(_sceneMatrixDescHeap.ReleaseAndGetAddressOf()));
+	_sceneMatrixDescHeap->SetName(L"BasicDescHeap");
+	auto basicHeapHandle = _sceneMatrixDescHeap->GetCPUDescriptorHandleForHeapStart();
 
 	// シェーダーリソースビュー（定数バッファー）
 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-	cbvDesc.BufferLocation = _constBuff->GetGPUVirtualAddress();
-	cbvDesc.SizeInBytes = static_cast<UINT>(_constBuff->GetDesc().Width);
+	cbvDesc.BufferLocation = _sceneMatrixConstantBuffer->GetGPUVirtualAddress();
+	cbvDesc.SizeInBytes = static_cast<UINT>(_sceneMatrixConstantBuffer->GetDesc().Width);
 	pDevice->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
 
 	_pmdRenderer.reset(new pmd::PMDRenderer(_d3d12Env->GetDevice().Get()));
 	_pmdActor.reset(new pmd::PMDActor());
 
 	result = pmd::PMDMaterial::LoadDefaultTextures(pDevice.Get());
-	result = _pmdActor->LoadFromFile(pDevice.Get(), _resourceCache.get(), ModelPath + L"/初音ミク.pmd", ToonBmpPath);
-	//result = mesh.LoadFromFile(_device, ModelPath + L"/初音ミクmetal.pmd");
-	//result = mesh.LoadFromFile(_device, ModelPath + L"/巡音ルカ.pmd");
+	result = _pmdActor->LoadFromFile(pDevice.Get(), _resourceCache.get(), ModelPath, ToonBmpPath);
 
 	return S_OK;
 }
@@ -104,7 +104,6 @@ void
 Application::Run()
 {
 	MSG msg = {};
-	auto angle = 0.0f;
 
 	auto pDevice = _d3d12Env->GetDevice();
 
@@ -112,7 +111,6 @@ Application::Run()
 	DirectX::XMFLOAT3 eye(0, 15, -15);
 	DirectX::XMFLOAT3 target(0, 15, 0);
 	DirectX::XMFLOAT3 up(0, 1, 0);
-	DirectX::XMMATRIX worldMatrix;
 
 	auto viewMatrix = DirectX::XMMatrixLookAtLH(DirectX::XMLoadFloat3(&eye), DirectX::XMLoadFloat3(&target), DirectX::XMLoadFloat3(&up));
 	auto aspectRatio = static_cast<float>(DefaultWindowWidth) / DefaultWindowHeight;
@@ -137,17 +135,14 @@ Application::Run()
 
 		_d3d12Env->BeginDraw();
 
-		ID3D12DescriptorHeap* descHeaps[] = { _basicDescHeap.Get() };
+		ID3D12DescriptorHeap* descHeaps[] = { _sceneMatrixDescHeap.Get() };
 		commandList->SetPipelineState(_pmdRenderer->GetPipelineState());
 		commandList->SetGraphicsRootSignature(_pmdRenderer->GetRootSingnature());
 
 		commandList->SetDescriptorHeaps(1, descHeaps);
-		commandList->SetGraphicsRootDescriptorTable(0, _basicDescHeap->GetGPUDescriptorHandleForHeapStart());
+		commandList->SetGraphicsRootDescriptorTable(0, _sceneMatrixDescHeap->GetGPUDescriptorHandleForHeapStart());
+		_pmdActor->Update();
 		_pmdActor->Draw(pDevice.Get(), commandList.Get());
-
-		angle += 0.01f;
-		worldMatrix = DirectX::XMMatrixRotationY(angle);
-		_mappedMatrix->world = worldMatrix;
 
 		_d3d12Env->EndDraw();
 	}
