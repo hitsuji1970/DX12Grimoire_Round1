@@ -7,66 +7,20 @@
 
 namespace pmd
 {
-	template<typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
-	ComPtr<ID3D12Resource> PMDMesh::TheWhiteTexture;
-	ComPtr<ID3D12Resource> PMDMesh::TheBlackTexture;
-	ComPtr<ID3D12Resource> PMDMesh::TheGradTexture;
-
-	/**
-	 * コンストラクター
-	 */
+	// コンストラクター
 	PMDMesh::PMDMesh() :
 		indicesNum(0), basicMaterial(), additionalMaterial(),
 		pTextureResource(nullptr), pSPHResource(nullptr), pSPAResource(nullptr),
 		pToonResource(nullptr)
 	{
-
 	}
 
-	/**
-	 * デストラクター
-	 */
+	// デストラクター
 	PMDMesh::~PMDMesh()
 	{
 	}
 
-	/**
-	 * 指定が無い場合に適用する加算・乗算テクスチャーのロード
-	 */
-	HRESULT PMDMesh::LoadDefaultTextures(ID3D12Device* pD3D12Device)
-	{
-		TheWhiteTexture = CreateSingleColorTexture(pD3D12Device, 0xff, 0xff, 0xff, 0xff);
-		if (TheWhiteTexture == nullptr) {
-			return E_FAIL;
-		}
-		TheWhiteTexture->SetName(L"White Texture");
-
-		TheBlackTexture = CreateSingleColorTexture(pD3D12Device, 0x00, 0x00, 0x00, 0xff);
-		if (TheBlackTexture == nullptr) {
-			return E_FAIL;
-		}
-		TheBlackTexture->SetName(L"Black Texture");
-
-		TheGradTexture = CreateGrayGradationTexture(pD3D12Device);
-		if (TheGradTexture == nullptr) {
-			return E_FAIL;
-		}
-		TheGradTexture->SetName(L"Grad Texture");
-
-		return S_OK;
-	}
-
-	void PMDMesh::ReleaseDefaultTextures()
-	{
-		TheWhiteTexture->Release();
-		TheBlackTexture->Release();
-		TheGradTexture->Release();
-	}
-
-	/**
-	 * ファイルから読み込んだシリアライズ済みデータを展開
-	 */
+	// ファイルから読み込んだシリアライズ済みデータを展開
 	HRESULT PMDMesh::LoadFromSerializedData(
 		D3D12ResourceCache* const pResourceCache,
 		const SerializedMeshData& serializedData,
@@ -118,8 +72,10 @@ namespace pmd
 		return result;
 	}
 
-	void PMDMesh::CreateTextureBuffers(
+	// マテリアルに適用するテクスチャービューの生成
+	void PMDMesh::CreateMaterialTextureViews(
 		ID3D12Device* pD3D12Device,
+		D3D12ResourceCache* pResourceCache,
 		D3D12_CPU_DESCRIPTOR_HANDLE* const pDescriptorHandle
 	) {
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -136,8 +92,9 @@ namespace pmd
 			pD3D12Device->CreateShaderResourceView(pTextureResource.Get(), &srvDesc, *pDescriptorHandle);
 		}
 		else {
-			srvDesc.Format = TheWhiteTexture->GetDesc().Format;
-			pD3D12Device->CreateShaderResourceView(TheWhiteTexture.Get(), &srvDesc, *pDescriptorHandle);
+			auto theWhiteTexture = pResourceCache->GetWhiteTexture();
+			srvDesc.Format = theWhiteTexture->GetDesc().Format;
+			pD3D12Device->CreateShaderResourceView(theWhiteTexture, &srvDesc, *pDescriptorHandle);
 		}
 		pDescriptorHandle->ptr += incSize;
 
@@ -147,8 +104,9 @@ namespace pmd
 			pD3D12Device->CreateShaderResourceView(pSPHResource.Get(), &srvDesc, *pDescriptorHandle);
 		}
 		else {
-			srvDesc.Format = TheWhiteTexture->GetDesc().Format;
-			pD3D12Device->CreateShaderResourceView(TheWhiteTexture.Get(), &srvDesc, *pDescriptorHandle);
+			auto theWhiteTexture = pResourceCache->GetWhiteTexture();
+			srvDesc.Format = theWhiteTexture->GetDesc().Format;
+			pD3D12Device->CreateShaderResourceView(theWhiteTexture, &srvDesc, *pDescriptorHandle);
 		}
 		pDescriptorHandle->ptr += incSize;
 
@@ -158,8 +116,9 @@ namespace pmd
 			pD3D12Device->CreateShaderResourceView(pSPAResource.Get(), &srvDesc, *pDescriptorHandle);
 		}
 		else {
-			srvDesc.Format = TheBlackTexture->GetDesc().Format;
-			pD3D12Device->CreateShaderResourceView(TheBlackTexture.Get(), &srvDesc, *pDescriptorHandle);
+			auto theBlackTexture = pResourceCache->GetBlackTexture();
+			srvDesc.Format = theBlackTexture->GetDesc().Format;
+			pD3D12Device->CreateShaderResourceView(theBlackTexture, &srvDesc, *pDescriptorHandle);
 		}
 		pDescriptorHandle->ptr += incSize;
 
@@ -169,8 +128,9 @@ namespace pmd
 			pD3D12Device->CreateShaderResourceView(pToonResource.Get(), &srvDesc, *pDescriptorHandle);
 		}
 		else {
-			srvDesc.Format = TheGradTexture->GetDesc().Format;
-			pD3D12Device->CreateShaderResourceView(TheGradTexture.Get(), &srvDesc, *pDescriptorHandle);
+			auto theGradationTexture = pResourceCache->GetGrayGradationTexture();
+			srvDesc.Format = theGradationTexture->GetDesc().Format;
+			pD3D12Device->CreateShaderResourceView(theGradationTexture, &srvDesc, *pDescriptorHandle);
 		}
 		pDescriptorHandle->ptr += incSize;
 	}

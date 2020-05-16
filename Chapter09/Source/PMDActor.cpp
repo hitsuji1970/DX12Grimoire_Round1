@@ -148,7 +148,7 @@ namespace pmd
 		}
 
 		// マテリアルのバッファーを作成
-		result = CreateMaterialBuffers(pD3D12Device, numberOfMesh, serializedMeshes);
+		result = CreateMaterialBuffers(pD3D12Device, pResourceCache, numberOfMesh, serializedMeshes);
 
 		// 変換行列の定数バッファー
 		result = pD3D12Device->CreateCommittedResource(
@@ -255,6 +255,7 @@ namespace pmd
 	// マテリアルバッファーの作成
 	HRESULT PMDActor::CreateMaterialBuffers(
 		ID3D12Device* const pD3D12Device,
+		D3D12ResourceCache* const pResourceCache,
 		unsigned int numberOfMesh,
 		const std::vector<SerializedMeshData>& serializedMaterials
 	) {
@@ -301,7 +302,7 @@ namespace pmd
 			pD3D12Device->CreateConstantBufferView(&matCBVDesc, matDescHeapH);
 			matCBVDesc.BufferLocation += materialBufferSize;
 			matDescHeapH.ptr += incSize;
-			_meshes[i].CreateTextureBuffers(pD3D12Device, &matDescHeapH);
+			_meshes[i].CreateMaterialTextureViews(pD3D12Device, pResourceCache, &matDescHeapH);
 		}
 
 		return S_OK;

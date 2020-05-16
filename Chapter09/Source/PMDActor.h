@@ -105,7 +105,11 @@ namespace pmd
 	private:
 		HRESULT CreateVertexBuffer(ID3D12Device* const pD3D12Device, const std::vector<unsigned char>& rawVertices);
 		HRESULT CreateIndexBuffer(ID3D12Device* const pD3D12Device, const std::vector<unsigned short>& rawIndices);
-		HRESULT CreateMaterialBuffers(ID3D12Device* const pD3D12Device, unsigned int numberOfMesh, const std::vector<SerializedMeshData>& serializedMaterials);
+		HRESULT CreateMaterialBuffers(
+			ID3D12Device* const pD3D12Device,
+			D3D12ResourceCache* const pResourceCache,
+			unsigned int numberOfMesh,
+			const std::vector<SerializedMeshData>& serializedMaterials);
 	};
 
 } // namespace pmd

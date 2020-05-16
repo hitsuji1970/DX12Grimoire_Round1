@@ -58,10 +58,6 @@ namespace pmd
 		PMDMesh();
 		virtual ~PMDMesh();
 
-		/** 共通のデフォルトテクスチャーをロード */
-		static HRESULT LoadDefaultTextures(ID3D12Device* const pD3d12Device);
-		static void ReleaseDefaultTextures();
-
 		// ファイルから読み込んだシリアライズ済みデータの展開
 		HRESULT LoadFromSerializedData(
 			D3D12ResourceCache* const pResourceCache,
@@ -69,9 +65,10 @@ namespace pmd
 			const std::wstring& folderPath,
 			const std::wstring& toonTexturePath);
 
-		// テクスチャー用バッファーリソースの生成
-		void CreateTextureBuffers(
+		// マテリアルに適用するテクスチャーリソースの生成
+		void CreateMaterialTextureViews(
 			ID3D12Device* const pD3D12Device,
+			D3D12ResourceCache* const pResourceCache,
 			D3D12_CPU_DESCRIPTOR_HANDLE* const pDescriptorHeapHandle);
 
 		// 描画命令の発効時に参照するインデックス数
@@ -85,16 +82,6 @@ namespace pmd
 		{
 			return basicMaterial;
 		}
-
-	private:
-		// 白テクスチャー
-		static Microsoft::WRL::ComPtr<ID3D12Resource> TheWhiteTexture;
-
-		// 黒テクスチャー
-		static Microsoft::WRL::ComPtr<ID3D12Resource> TheBlackTexture;
-
-		// 白黒のグラデーションテクスチャー
-		static Microsoft::WRL::ComPtr<ID3D12Resource> TheGradTexture;
 
 	private:
 		UINT indicesNum;

@@ -7,8 +7,6 @@ int main()
 int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 #endif
 {
-	DebugOutputFromString("toon shading test.");
-
 	Application app;
 	app.Initialize();
 	app.Run();

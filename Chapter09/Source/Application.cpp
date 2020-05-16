@@ -89,10 +89,11 @@ Application::Initialize()
 	cbvDesc.SizeInBytes = static_cast<UINT>(_sceneMatrixConstantBuffer->GetDesc().Width);
 	pDevice->CreateConstantBufferView(&cbvDesc, basicHeapHandle);
 
+	// PMD共通描画環境の初期化
 	_pmdRenderer.reset(new pmd::PMDRenderer(_d3d12Env->GetDevice().Get()));
-	_pmdActor.reset(new pmd::PMDActor());
 
-	result = pmd::PMDMesh::LoadDefaultTextures(pDevice.Get());
+	// PMDモデルの初期化
+	_pmdActor.reset(new pmd::PMDActor());
 	result = _pmdActor->LoadFromFile(pDevice.Get(), _resourceCache.get(), ModelPath, ToonBmpPath);
 
 	return S_OK;
@@ -151,8 +152,6 @@ Application::Run()
 void
 Application::Terminate()
 {
-	pmd::PMDMesh::ReleaseDefaultTextures();
-
 	ID3D12DebugDevice* debugInterface;
 	if (SUCCEEDED(_d3d12Env->GetDevice()->QueryInterface(&debugInterface)))
 	{
