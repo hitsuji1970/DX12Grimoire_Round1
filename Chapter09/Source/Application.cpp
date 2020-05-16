@@ -16,18 +16,22 @@
 #include "utils.h"
 
 // PMDモデルファイル名
-//const std::wstring ModelPath = L"D:/madobe/MMD_DATA/MMD-Nanami/Nanami.pmd";
-const std::wstring ModelPath = L"D:/MikuMikuDance_v932x64/UserFile/Model/初音ミク.pmd";
+const std::wstring ModelPath = L"MMD/UserFile/Model";
+const std::wstring ModelFile = ModelPath + L"/初音ミク.pmd";
+//const std::wstring ModelFile = ModelPath + L"/MMD-Nanami/Nanami.pmd";
+//const std::wstring ModelFile = ModelPath + L"/MMD-Claudia/Claudia.pmd";
 
 // トゥーンシェーディング用テクスチャー読み込みパス
-const std::wstring ToonBmpPath = L"D:/MikuMikuDance_v932x64/Data";
+const std::wstring ToonBmpPath = L"MMD/Data";
 
+// コンストラクター
 Application::Application() :
 	_hWnd(nullptr), _wndClass(), _d3d12Env(nullptr), _sceneMatrixDescHeap(nullptr),
 	_sceneMatrixConstantBuffer(nullptr), _mappedMatrix(nullptr), _pmdRenderer(nullptr)
 {
 }
 
+// デストラクター
 Application::~Application()
 {
 }
@@ -94,7 +98,7 @@ Application::Initialize()
 
 	// PMDモデルの初期化
 	_pmdActor.reset(new pmd::PMDActor());
-	result = _pmdActor->LoadFromFile(pDevice.Get(), _resourceCache.get(), ModelPath, ToonBmpPath);
+	result = _pmdActor->LoadFromFile(pDevice.Get(), _resourceCache.get(), ModelFile, ToonBmpPath);
 
 	return S_OK;
 }
