@@ -17,6 +17,7 @@ struct SceneMatrix
 	DirectX::XMFLOAT3 eye;
 };
 
+// アプリケーション実行クラス
 class Application
 {
 public:
@@ -56,6 +57,7 @@ private:
 	// DirectX12リソースキャッシュ
 	std::unique_ptr<D3D12ResourceCache> _resourceCache;
 
+	// シーン共通の変換行列（定数バッファー）
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _sceneMatrixDescHeap;
 	Microsoft::WRL::ComPtr<ID3D12Resource> _sceneMatrixConstantBuffer;
 	SceneMatrix* _mappedMatrix;
