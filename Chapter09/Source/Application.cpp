@@ -136,10 +136,9 @@ Application::Run()
 		_d3d12Env->BeginDraw();
 
 		ID3D12DescriptorHeap* descHeaps[] = { _sceneMatrixDescHeap.Get() };
-		commandList->SetPipelineState(_pmdRenderer->GetPipelineState());
-		commandList->SetGraphicsRootSignature(_pmdRenderer->GetRootSingnature());
-
 		commandList->SetDescriptorHeaps(1, descHeaps);
+		commandList->SetGraphicsRootSignature(_pmdRenderer->GetRootSingnature());
+		commandList->SetPipelineState(_pmdRenderer->GetPipelineState());
 		commandList->SetGraphicsRootDescriptorTable(0, _sceneMatrixDescHeap->GetGPUDescriptorHandleForHeapStart());
 		_pmdActor->Update();
 		_pmdActor->Draw(pDevice.Get(), commandList.Get());
