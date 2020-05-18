@@ -8,7 +8,9 @@ VSOutput BasicVS(
 	min16uint weight : WEIGHT
 ) {
 	VSOutput output;
-	output.svpos = mul(mul(viewproj, world), pos);
+	pos = mul(bones[bone_no[0]], pos);
+	pos = mul(world, pos);
+	output.svpos = mul(viewproj, pos);
 	output.normal = mul(world, float4(normal.xyz, 0));
 	output.vnormal = mul(view, output.normal);
 	output.uv = uv;

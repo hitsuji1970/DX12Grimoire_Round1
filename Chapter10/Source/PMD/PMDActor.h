@@ -25,6 +25,18 @@ namespace pmd
 		char comment[256];		// モデルコメント
 	};
 
+	// ボーン構造体
+#pragma pack(1)
+	struct PMDBone {
+		char boneName[20];
+		unsigned short parentNo;
+		unsigned short nextNo;
+		unsigned char type;
+		unsigned short ikBoneNo;
+		DirectX::XMFLOAT3 pos;
+	};
+#pragma pack()
+
 	// PMD頂点構造体
 	struct Vertex
 	{
@@ -67,6 +79,15 @@ namespace pmd
 		void Draw(ID3D12Device* const pD3D12Device, ID3D12GraphicsCommandList* const pCommandList);
 
 	private:
+		struct BoneNode
+		{
+			int boneIdx;
+			DirectX::XMFLOAT3 startPos;
+			DirectX::XMFLOAT3 endPos;
+			std::vector<BoneNode*> children;
+		};
+
+	private:
 		// シェーダーリソース用テクスチャーの数
 		static constexpr size_t NUMBER_OF_TEXTURE = 4;
 
@@ -97,10 +118,13 @@ namespace pmd
 		// 変換行列
 		Microsoft::WRL::ComPtr<ID3D12Resource> _transformBuff;
 		Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> _transformDescHeap;
-		Transform* _mappedTransform;
+		DirectX::XMMATRIX* _mappedMatrices;
 
 		// 動作確認用の回転
 		float _angle;
+
+		std::vector<DirectX::XMMATRIX> _boneMatrices;
+		std::map<std::string, BoneNode> _boneNodeTable;
 
 	private:
 		HRESULT CreateVertexBuffer(ID3D12Device* const pD3D12Device, const std::vector<unsigned char>& rawVertices);
@@ -110,6 +134,7 @@ namespace pmd
 			D3D12ResourceCache* const pResourceCache,
 			unsigned int numberOfMesh,
 			const std::vector<SerializedMeshData>& serializedMaterials);
+		HRESULT CreateTransformView(ID3D12Device* const pD3D12Device);
 	};
 
 } // namespace pmd

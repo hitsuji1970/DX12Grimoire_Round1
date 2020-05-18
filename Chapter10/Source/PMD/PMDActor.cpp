@@ -67,7 +67,7 @@ namespace pmd
 		_vertexBuffer(nullptr), _vertexBufferView{},
 		_indexBuffer(nullptr), _indexBufferView{},
 		_materialBuffer(nullptr), _materialDescHeap(nullptr), _meshes{},
-		_transformBuff(nullptr), _transformDescHeap(nullptr), _mappedTransform(nullptr),
+		_transformBuff(nullptr), _transformDescHeap(nullptr), _mappedMatrices(nullptr),
 		_angle(0.0f)
 	{
 	}
@@ -75,9 +75,9 @@ namespace pmd
 	// デストラクター
 	PMDActor::~PMDActor()
 	{
-		if (_transformBuff && _mappedTransform) {
+		if (_transformBuff && _mappedMatrices) {
 			_transformBuff->Unmap(0, nullptr);
-			_mappedTransform = nullptr;
+			_mappedMatrices = nullptr;
 		}
 	}
 
@@ -137,7 +137,6 @@ namespace pmd
 		fread(&numberOfMesh, sizeof(numberOfMesh), 1, fp);
 		std::vector<SerializedMeshData> serializedMeshes(numberOfMesh);
 		fread(serializedMeshes.data(), serializedMeshes.size() * sizeof(SerializedMeshData), 1, fp);
-		std::fclose(fp);
 
 		_meshes.resize(numberOfMesh);
 		for (int i = 0; i < serializedMeshes.size(); i++) {
@@ -147,44 +146,53 @@ namespace pmd
 #endif // _DEBUG
 		}
 
+		// ボーン情報の読み込み
+		unsigned short boneNum = 0;
+		fread(&boneNum, sizeof(boneNum), 1, fp);
+
+		std::vector<PMDBone> pmdBones(boneNum);
+		fread(pmdBones.data(), sizeof(PMDBone), boneNum, fp);
+		printf("boneNum = %d\n", boneNum);
+		for (auto bone : pmdBones) {
+			printf("boneName = %s\n", bone.boneName);
+		}
+		// ここでファイルクローズ
+		std::fclose(fp);
+
 		// マテリアルのバッファーを作成
 		result = CreateMaterialBuffers(pD3D12Device, pResourceCache, numberOfMesh, serializedMeshes);
 
+		// ボーンノードマップを作る
+		std::vector<std::string> boneNames(pmdBones.size());
+		for (int i = 0; i < pmdBones.size(); i++)
+		{
+			const auto& bone = pmdBones[i];
+			boneNames[i] = bone.boneName;
+			auto& node = _boneNodeTable[bone.boneName];
+			node.boneIdx = i;
+			node.startPos = bone.pos;
+		}
+
+		// 親子関係を構築する
+		for (auto& bone : pmdBones) {
+			// 親インデックスをチェックしてあり得ない番号なら飛ばす
+			if (bone.parentNo >= pmdBones.size()) {
+				continue;
+			}
+			const auto parentName = boneNames[bone.parentNo];
+			_boneNodeTable[parentName].children.emplace_back(&_boneNodeTable[bone.boneName]);
+		}
+
+		// 全てのボーンを初期化
+		_boneMatrices.resize(pmdBones.size());
+		std::fill(_boneMatrices.begin(), _boneMatrices.end(), DirectX::XMMatrixIdentity());
+
 		// 変換行列の定数バッファー
-		result = pD3D12Device->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer((sizeof(Transform) + 0xff) & ~0xff),
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(_transformBuff.ReleaseAndGetAddressOf()));
-		_transformBuff->SetName(L"ConstantBuffer(PMDActor)");
+		result = CreateTransformView(pD3D12Device);
 		if (FAILED(result))
 		{
 			return result;
 		}
-
-		// 変換行列の書き込みマップ
-		result = _transformBuff->Map(0, nullptr, (void**)&_mappedTransform);
-
-		// 変換行列のシェーダーリソースビュー
-		D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
-		descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		descHeapDesc.NodeMask = 0;
-		descHeapDesc.NumDescriptors = 1;
-		descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		result = pD3D12Device->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(_transformDescHeap.ReleaseAndGetAddressOf()));
-		if (FAILED(result))
-		{
-			return result;
-		}
-
-		_transformDescHeap->SetName(L"TransformDescHeap(PMDActor)");
-		auto heapHandle = _transformDescHeap->GetCPUDescriptorHandleForHeapStart();
-		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-		cbvDesc.BufferLocation = _transformBuff->GetGPUVirtualAddress();
-		cbvDesc.SizeInBytes = static_cast<UINT>(_transformBuff->GetDesc().Width);
-		pD3D12Device->CreateConstantBufferView(&cbvDesc, heapHandle);
 
 		// ロードしたモデルのパスを一応保持
 		m_loadedModelPath = filename;
@@ -308,11 +316,62 @@ namespace pmd
 		return S_OK;
 	}
 
+	// 定数バッファーの作成
+	HRESULT PMDActor::CreateTransformView(ID3D12Device* const pD3D12Device)
+	{
+		HRESULT result;
+
+		auto buffSize = sizeof(Transform) * (1 + _boneMatrices.size());
+		buffSize = (buffSize + 0xff) & ~0xff;
+
+		result = pD3D12Device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(buffSize),
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(_transformBuff.ReleaseAndGetAddressOf()));
+		_transformBuff->SetName(L"ConstantBuffer(PMDActor)");
+		if (FAILED(result)) {
+			return result;
+		}
+
+		// 変換行列の書き込みマップ
+		result = _transformBuff->Map(0, nullptr, (void**)&_mappedMatrices);
+		if (FAILED(result)) {
+			return result;
+		}
+
+		// 変換行列のシェーダーリソースビュー
+		D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
+		descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		descHeapDesc.NodeMask = 0;
+		descHeapDesc.NumDescriptors = 1;
+		descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		result = pD3D12Device->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(_transformDescHeap.ReleaseAndGetAddressOf()));
+		if (FAILED(result))
+		{
+			return result;
+		}
+
+		_transformDescHeap->SetName(L"TransformDescHeap(PMDActor)");
+		auto heapHandle = _transformDescHeap->GetCPUDescriptorHandleForHeapStart();
+		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+		cbvDesc.BufferLocation = _transformBuff->GetGPUVirtualAddress();
+		cbvDesc.SizeInBytes = static_cast<UINT>(_transformBuff->GetDesc().Width);
+		pD3D12Device->CreateConstantBufferView(&cbvDesc, heapHandle);
+
+		// 単位行列で埋めた_boneMatricesの内容をコピー
+		std::copy(_boneMatrices.begin(), _boneMatrices.end(), &_mappedMatrices[1]);
+
+		return S_OK;
+	}
+
 	// フレーム更新
 	void PMDActor::Update()
 	{
 		_angle += 0.01f;
-		_mappedTransform->world = DirectX::XMMatrixRotationY(_angle);
+		_mappedMatrices[0] = DirectX::XMMatrixRotationY(_angle);
 	}
 
 	// 描画
