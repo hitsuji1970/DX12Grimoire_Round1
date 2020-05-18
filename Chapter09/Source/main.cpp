@@ -8,7 +8,9 @@ int WINAPI _tWinMain(HINSTANCE, HINSTANCE, LPTSTR, int)
 #endif
 {
 	Application app;
-	app.Initialize();
+	if (FAILED(app.Initialize())) {
+		return -1;
+	}
 	app.Run();
 	app.Terminate();
 

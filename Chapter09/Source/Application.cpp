@@ -99,6 +99,12 @@ Application::Initialize()
 	// PMDモデルの初期化
 	_pmdActor.reset(new pmd::PMDActor());
 	result = _pmdActor->LoadFromFile(pDevice.Get(), _resourceCache.get(), ModelFile, ToonBmpPath);
+	if (FAILED(result))
+	{
+		std::wstring errMsg = L"\"" + ModelFile + L"\":\nファイルの読み込みに失敗しました。\n\nMMD/以下にファイルを正しく配置してください。";
+		MessageBox(_hWnd, errMsg.c_str(), L"読み込みエラー", MB_ICONERROR);
+		return result;
+	}
 
 	return S_OK;
 }
