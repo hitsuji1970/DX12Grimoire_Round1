@@ -361,7 +361,14 @@ namespace pmd
 		cbvDesc.SizeInBytes = static_cast<UINT>(_transformBuff->GetDesc().Width);
 		pD3D12Device->CreateConstantBufferView(&cbvDesc, heapHandle);
 
-		// 単位行列で埋めた_boneMatricesの内容をコピー
+		// 特定のノード（左腕）をZ軸周りに90°回転させてみる
+		auto node = _boneNodeTable["左腕"];
+		auto& pos = node.startPos;
+		_boneMatrices[node.boneIdx] =
+			DirectX::XMMatrixTranslation(-pos.x, -pos.y, -pos.z)
+			* DirectX::XMMatrixRotationZ(DirectX::XM_PIDIV2)
+			* DirectX::XMMatrixTranslation(pos.x, pos.y, pos.z);
+
 		std::copy(_boneMatrices.begin(), _boneMatrices.end(), &_mappedMatrices[1]);
 
 		return S_OK;
