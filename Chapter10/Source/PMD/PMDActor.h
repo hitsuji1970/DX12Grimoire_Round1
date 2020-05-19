@@ -132,9 +132,11 @@ namespace pmd
 		HRESULT CreateMaterialBuffers(
 			ID3D12Device* const pD3D12Device,
 			D3D12ResourceCache* const pResourceCache,
-			unsigned int numberOfMesh,
-			const std::vector<SerializedMeshData>& serializedMaterials);
+			unsigned int numberOfMesh);
 		HRESULT CreateTransformView(ID3D12Device* const pD3D12Device);
+
+	private:
+		void RecursiveMatrixMultiply(const BoneNode* const pBoneNode, const DirectX::XMMATRIX& matrix);
 	};
 
 } // namespace pmd

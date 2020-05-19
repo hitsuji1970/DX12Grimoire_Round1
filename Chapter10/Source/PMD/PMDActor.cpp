@@ -142,9 +142,12 @@ namespace pmd
 		for (int i = 0; i < serializedMeshes.size(); i++) {
 			_meshes[i].LoadFromSerializedData(pResourceCache, serializedMeshes[i], folderPath, toonTexturePath);
 #ifdef _DEBUG
-			wprintf(L"material[%d]:", i);
+			printf("mesh[%d]:", i);
 #endif // _DEBUG
 		}
+#ifdef _DEBUG
+		printf("\n");
+#endif // _DEBUG
 
 		// ボーン情報の読み込み
 		unsigned short boneNum = 0;
@@ -160,7 +163,7 @@ namespace pmd
 		std::fclose(fp);
 
 		// マテリアルのバッファーを作成
-		result = CreateMaterialBuffers(pD3D12Device, pResourceCache, numberOfMesh, serializedMeshes);
+		result = CreateMaterialBuffers(pD3D12Device, pResourceCache, numberOfMesh);
 
 		// ボーンノードマップを作る
 		std::vector<std::string> boneNames(pmdBones.size());
@@ -260,12 +263,11 @@ namespace pmd
 		return S_OK;
 	}
 
-	// マテリアルバッファーの作成
+	// メッシュ単位で参照されるマテリアルバッファーの作成
 	HRESULT PMDActor::CreateMaterialBuffers(
 		ID3D12Device* const pD3D12Device,
 		D3D12ResourceCache* const pResourceCache,
-		unsigned int numberOfMesh,
-		const std::vector<SerializedMeshData>& serializedMaterials
+		unsigned int numberOfMesh
 	) {
 		HRESULT result;
 		auto materialBufferSize = sizeof(BasicMaterial);
@@ -316,7 +318,7 @@ namespace pmd
 		return S_OK;
 	}
 
-	// 定数バッファーの作成
+	// 座標変換行列を格納する定数バッファービューの作成
 	HRESULT PMDActor::CreateTransformView(ID3D12Device* const pD3D12Device)
 	{
 		HRESULT result;
@@ -362,16 +364,36 @@ namespace pmd
 		pD3D12Device->CreateConstantBufferView(&cbvDesc, heapHandle);
 
 		// 特定のノード（左腕）をZ軸周りに90°回転させてみる
-		auto node = _boneNodeTable["左腕"];
-		auto& pos = node.startPos;
-		_boneMatrices[node.boneIdx] =
-			DirectX::XMMatrixTranslation(-pos.x, -pos.y, -pos.z)
+		auto armNode = _boneNodeTable["左腕"];
+		auto& armPos = armNode.startPos;
+		auto armMatrix = 
+			DirectX::XMMatrixTranslation(-armPos.x, -armPos.y, -armPos.z)
 			* DirectX::XMMatrixRotationZ(DirectX::XM_PIDIV2)
-			* DirectX::XMMatrixTranslation(pos.x, pos.y, pos.z);
+			* DirectX::XMMatrixTranslation(armPos.x, armPos.y, armPos.z);
+		_boneMatrices[armNode.boneIdx] = armMatrix;
+		//RecursiveMatrixMultiply(&armNode, armMatrix);
+
+		auto elbowNode = _boneNodeTable["左ひじ"];
+		auto& elbowPos = elbowNode.startPos;
+		auto elbowMatrix = 
+			DirectX::XMMatrixTranslation(-elbowPos.x, -elbowPos.y, -elbowPos.z)
+			* DirectX::XMMatrixRotationZ(-DirectX::XM_PIDIV2)
+			* DirectX::XMMatrixTranslation(elbowPos.x, elbowPos.y, elbowPos.z);
+		//RecursiveMatrixMultiply(&elbowNode, elbowMatrix);
+		_boneMatrices[elbowNode.boneIdx] = elbowMatrix;
+		RecursiveMatrixMultiply(&_boneNodeTable["センター"], DirectX::XMMatrixIdentity());
 
 		std::copy(_boneMatrices.begin(), _boneMatrices.end(), &_mappedMatrices[1]);
 
 		return S_OK;
+	}
+
+	void PMDActor::RecursiveMatrixMultiply(const BoneNode* const pNode, const DirectX::XMMATRIX& matrix)
+	{
+		_boneMatrices[pNode->boneIdx] *= matrix;
+		for (auto& childNode : pNode->children) {
+			RecursiveMatrixMultiply(childNode, _boneMatrices[pNode->boneIdx]);
+		}
 	}
 
 	// フレーム更新
