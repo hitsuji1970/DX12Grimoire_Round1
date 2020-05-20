@@ -165,18 +165,14 @@ namespace pmd
 		auto pNumberOfBone = reinterpret_cast<unsigned short*>(pMeshData + numberOfMesh);
 		auto numberOfBone = *pNumberOfBone;
 		auto pBoneData = reinterpret_cast<PMDBone*>(pNumberOfBone + 1);
-		std::vector<PMDBone> pmdBones(numberOfBone);
-		std::memcpy(pmdBones.data(), pBoneData, sizeof(PMDBone) * numberOfBone);
 		printf("boneNum = %d\n", numberOfBone);
-		for (auto bone : pmdBones) {
-			printf("boneName = %s\n", bone.boneName);
-		}
 
 		// ボーンノードマップを作る
-		std::vector<std::string> boneNames(pmdBones.size());
-		for (int i = 0; i < pmdBones.size(); i++)
+		std::vector<std::string> boneNames(numberOfBone);
+		for (int i = 0; i < numberOfBone; i++)
 		{
-			const auto& bone = pmdBones[i];
+			const auto& bone = pBoneData[i];
+			printf("boneName = %s\n", bone.boneName);
 			boneNames[i] = bone.boneName;
 			auto& node = _boneNodeTable[bone.boneName];
 			node.boneIdx = i;
@@ -184,9 +180,10 @@ namespace pmd
 		}
 
 		// 親子関係を構築する
-		for (auto& bone : pmdBones) {
+		for (int i = 0; i < numberOfBone; i++){
+			const auto& bone = pBoneData[i];
 			// 親インデックスをチェックしてあり得ない番号なら飛ばす
-			if (bone.parentNo >= pmdBones.size()) {
+			if (bone.parentNo >= numberOfBone) {
 				continue;
 			}
 			const auto parentName = boneNames[bone.parentNo];
@@ -194,7 +191,7 @@ namespace pmd
 		}
 
 		// 全てのボーンを初期化
-		_boneMatrices.resize(pmdBones.size());
+		_boneMatrices.resize(numberOfBone);
 		std::fill(_boneMatrices.begin(), _boneMatrices.end(), DirectX::XMMatrixIdentity());
 
 		// 変換行列の定数バッファー
