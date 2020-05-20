@@ -96,6 +96,14 @@ namespace pmd
 			return E_FAIL;
 		}
 
+		// ファイル内容を全て読み込む
+		fseek(fp, 0, SEEK_END);
+		auto size = ftell(fp);
+		fseek(fp, 0, SEEK_SET);
+		std::vector<unsigned char> buff(size);
+		fread(buff.data(), size, 1, fp);
+		fclose(fp);
+
 		auto pathIndex = filename.rfind('/');
 		if (pathIndex == filename.npos) {
 			pathIndex = filename.rfind('\\');
@@ -103,44 +111,45 @@ namespace pmd
 		auto folderPath = filename.substr(0, pathIndex);
 
 		// シグネチャーとヘッダー情報
-		std::fread(_pmdSignature, sizeof(_pmdSignature), 1, fp);
-		std::fread(&_pmdHeader, sizeof(_pmdHeader), 1, fp);
+		std::memcpy(_pmdSignature, buff.data(), sizeof(_pmdSignature));
+		auto pHeader = reinterpret_cast<PMDHeader*>(buff.data() + sizeof(_pmdSignature));
+		_pmdHeader = *pHeader;
 
 		// 頂点データの読み込みと頂点バッファーの生成
-		unsigned int numberOfVertex;
-		std::vector<unsigned char> rawVertices;
-		std::fread(&numberOfVertex, sizeof(numberOfVertex), 1, fp);
-		rawVertices.resize(numberOfVertex * VERTEX_SIZE);
-		std::fread(rawVertices.data(), rawVertices.size(), 1, fp);
+		auto pNumberOfVertex = reinterpret_cast<unsigned int*>(pHeader + 1);
+		auto numberOfVertex = *pNumberOfVertex;
+		auto vertexDataSize = sizeof(SerializedVertex) * numberOfVertex;
+		auto pVertexData = reinterpret_cast<unsigned char*>(pNumberOfVertex + 1);
+		std::vector<unsigned char> rawVertices(vertexDataSize);
+		std::memcpy(rawVertices.data(), pVertexData, vertexDataSize);
 		result = CreateVertexBuffer(pD3D12Device, rawVertices);
 		if (FAILED(result))
 		{
-			std::fclose(fp);
 			return result;
 		}
 
 		// インデックスデータの読み込みとインデックスバッファーの生成
-		unsigned int numberOfIndex;
-		std::vector<unsigned short> rawIndices;
-		std::fread(&numberOfIndex, sizeof(numberOfIndex), 1, fp);
-		rawIndices.resize(numberOfIndex);
-		fread(rawIndices.data(), rawIndices.size() * sizeof(rawIndices[0]), 1, fp);
+		auto pNumberOfIndex = reinterpret_cast<unsigned int*>(pVertexData + vertexDataSize);
+		auto numberOfIndex = *pNumberOfIndex;
+		auto pIndexData = reinterpret_cast<unsigned short*>(pNumberOfIndex + 1);
+		std::vector<unsigned short> rawIndices(numberOfIndex);
+		std::memcpy(rawIndices.data(), pIndexData, sizeof(unsigned short) * numberOfIndex);
 		result = CreateIndexBuffer(pD3D12Device, rawIndices);
 		if (FAILED(result))
 		{
-			std::fclose(fp);
 			return result;
 		}
 
 		// メッシュ情報の読み込み
-		unsigned int numberOfMesh;
-		fread(&numberOfMesh, sizeof(numberOfMesh), 1, fp);
-		std::vector<SerializedMeshData> serializedMeshes(numberOfMesh);
-		fread(serializedMeshes.data(), serializedMeshes.size() * sizeof(SerializedMeshData), 1, fp);
-
+		auto pNumberOfMesh = reinterpret_cast<unsigned int*>(pIndexData + numberOfIndex);
+		auto numberOfMesh = *pNumberOfMesh;
+		auto pMeshData = reinterpret_cast<SerializedMeshData*>(pNumberOfMesh + 1);
 		_meshes.resize(numberOfMesh);
-		for (int i = 0; i < serializedMeshes.size(); i++) {
-			_meshes[i].LoadFromSerializedData(pResourceCache, serializedMeshes[i], folderPath, toonTexturePath);
+		for (auto i = 0u; i < numberOfMesh; i++) {
+			result = _meshes[i].LoadFromSerializedData(pResourceCache, pMeshData[i], folderPath, toonTexturePath);
+			if (FAILED(result)) {
+				return result;
+			}
 #ifdef _DEBUG
 			printf("mesh[%d]:", i);
 #endif // _DEBUG
@@ -149,21 +158,19 @@ namespace pmd
 		printf("\n");
 #endif // _DEBUG
 
-		// ボーン情報の読み込み
-		unsigned short boneNum = 0;
-		fread(&boneNum, sizeof(boneNum), 1, fp);
+		// マテリアルのバッファーを作成
+		result = CreateMaterialBuffers(pD3D12Device, pResourceCache, numberOfMesh);
 
-		std::vector<PMDBone> pmdBones(boneNum);
-		fread(pmdBones.data(), sizeof(PMDBone), boneNum, fp);
-		printf("boneNum = %d\n", boneNum);
+		// ボーン情報の読み込み
+		auto pNumberOfBone = reinterpret_cast<unsigned short*>(pMeshData + numberOfMesh);
+		auto numberOfBone = *pNumberOfBone;
+		auto pBoneData = reinterpret_cast<PMDBone*>(pNumberOfBone + 1);
+		std::vector<PMDBone> pmdBones(numberOfBone);
+		std::memcpy(pmdBones.data(), pBoneData, sizeof(PMDBone) * numberOfBone);
+		printf("boneNum = %d\n", numberOfBone);
 		for (auto bone : pmdBones) {
 			printf("boneName = %s\n", bone.boneName);
 		}
-		// ここでファイルクローズ
-		std::fclose(fp);
-
-		// マテリアルのバッファーを作成
-		result = CreateMaterialBuffers(pD3D12Device, pResourceCache, numberOfMesh);
 
 		// ボーンノードマップを作る
 		std::vector<std::string> boneNames(pmdBones.size());
@@ -228,7 +235,7 @@ namespace pmd
 
 		_vertexBufferView.BufferLocation = _vertexBuffer->GetGPUVirtualAddress();
 		_vertexBufferView.SizeInBytes = static_cast<UINT>(rawVertices.size());
-		_vertexBufferView.StrideInBytes = VERTEX_SIZE;
+		_vertexBufferView.StrideInBytes = sizeof(SerializedVertex);
 
 		return S_OK;
 	}
@@ -371,7 +378,6 @@ namespace pmd
 			* DirectX::XMMatrixRotationZ(DirectX::XM_PIDIV2)
 			* DirectX::XMMatrixTranslation(armPos.x, armPos.y, armPos.z);
 		_boneMatrices[armNode.boneIdx] = armMatrix;
-		//RecursiveMatrixMultiply(&armNode, armMatrix);
 
 		auto elbowNode = _boneNodeTable["左ひじ"];
 		auto& elbowPos = elbowNode.startPos;
@@ -379,7 +385,6 @@ namespace pmd
 			DirectX::XMMatrixTranslation(-elbowPos.x, -elbowPos.y, -elbowPos.z)
 			* DirectX::XMMatrixRotationZ(-DirectX::XM_PIDIV2)
 			* DirectX::XMMatrixTranslation(elbowPos.x, elbowPos.y, elbowPos.z);
-		//RecursiveMatrixMultiply(&elbowNode, elbowMatrix);
 		_boneMatrices[elbowNode.boneIdx] = elbowMatrix;
 		RecursiveMatrixMultiply(&_boneNodeTable["センター"], DirectX::XMMatrixIdentity());
 

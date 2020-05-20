@@ -38,7 +38,8 @@ namespace pmd
 #pragma pack()
 
 	// PMD頂点構造体
-	struct Vertex
+#pragma pack(1)
+	struct SerializedVertex
 	{
 		DirectX::XMFLOAT3 pos;
 		DirectX::XMFLOAT3 normal;
@@ -47,6 +48,7 @@ namespace pmd
 		unsigned char boneWeight;
 		unsigned char endflg;
 	};
+#pragma pack()
 
 	// トランスフォーム
 	struct Transform
@@ -60,9 +62,6 @@ namespace pmd
 	class PMDActor
 	{
 	public:
-		// 頂点データのサイズ
-		static constexpr size_t VERTEX_SIZE = 38;
-
 		// 頂点レイアウト
 		static const std::vector<D3D12_INPUT_ELEMENT_DESC> InputLayout;
 
